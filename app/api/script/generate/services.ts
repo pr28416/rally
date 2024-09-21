@@ -101,7 +101,6 @@ const generateScript = async (
         3. B-roll search query (if applicable)
 
         Guidelines:
-        - Focus on the most relevant campaign policies. Pick one or two to focus on
         - Maintain a balance between candidate shots and B-roll
         - Whether or not a clip is B-roll, Kamala Harris will be speaking, so spoken_transcript should be what she says.
         - Keep the overall length to 45 seconds or less`;
@@ -116,15 +115,19 @@ const generateScript = async (
         }`,
         `City information: ${JSON.stringify(cityData)}`,
         `Campaign policies: ${JSON.stringify(relevantCampaignPolicies)}`,
+        `Instructions: ${overallScriptSystemPrompt}`,
+        `Example 1 of how Kamala Harris speaks: As a nation, we must recognize that access to healthcare is not a privilege, it is a right. Every person, no matter who they are, no matter where they live, deserves the ability to see a doctor, to get the care they need. And we cannot, and we will not, back down in the fight for women's rights — for the right to make decisions about our own bodies. We are strong, we are resilient, and we will continue to push for a future where healthcare is affordable, where women's rights are respected, and where justice is truly served for all.`,
+        `Example 2 of how Kamala Harris speaks: Climate change is an existential threat, and time is not on our side. The science is clear, and the consequences are real. From wildfires in California to hurricanes in the Gulf, we are already seeing the effects of climate change in our daily lives. But I am hopeful, because I know that when we come together, when we commit to bold action, we can meet this moment. We can protect our planet, create millions of green jobs, and ensure a sustainable future for generations to come.`,
+        `Example 3 of how Kamala Harris speaks: We are at a pivotal moment in our country's history. A moment where we must confront the injustices that have been allowed to persist for far too long. Racism, inequality, and discrimination have no place in America, and it is on all of us to build a country where everyone — no matter the color of their skin, their gender, or where they come from — has the opportunity to succeed. We are better than this, and together, we can turn pain into progress. We can turn anger into action.`,
     ].join("\n");
 
     const overallScriptResponse = await openai.beta.chat.completions.parse({
         model: "gpt-4o-2024-08-06",
         messages: [
-            {
-                role: "system",
-                content: overallScriptSystemPrompt,
-            },
+            // {
+            //     role: "system",
+            //     content: overallScriptSystemPrompt,
+            // },
             {
                 role: "user",
                 content: overallScriptUserPrompt,
@@ -134,6 +137,7 @@ const generateScript = async (
             AdSegmentArraySchema,
             "AdSegmentArray",
         ),
+        temperature: 1,
     });
 
     const script: z.infer<typeof AdSegmentArraySchema> =
