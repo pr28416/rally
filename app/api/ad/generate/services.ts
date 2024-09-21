@@ -37,9 +37,24 @@ export async function generateAd(voter: VoterRecord) {
         // TODO: Implement b-roll option generation
         // Will return a list of b-roll options if slot is b-roll, otherwise empty item
         const getBRollOptions = async (query: string) => {
-            // This function will be implemented later
-            // For now, it's a placeholder
-            return null;
+            const response = await fetch(
+                `${process.env.NEXT_PUBLIC_API_URL}/api/broll`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ query }),
+                },
+            );
+
+            if (!response.ok) {
+                console.error("Failed to generate b-roll options");
+                return [];
+            }
+
+            const data = await response.json();
+            return data.videos;
         };
 
         return Promise.all(script_segments.map(async (segment) => {
@@ -110,34 +125,34 @@ export async function generateAd(voter: VoterRecord) {
     }
 
     // Test current implementation
-    return {
-        wordTimings: segmentTimestamps.map((interval, index) => {
-            const [start, end] = interval;
-            const startMatch = audio_response.wordTimings.findIndex(
-                ([_, s, _e]) => s === start,
-            );
-            const endMatch = audio_response.wordTimings.findIndex(
-                ([_, _s, e]) => e === end,
-            );
+    // return {
+    //     wordTimings: segmentTimestamps.map((interval, index) => {
+    //         const [start, end] = interval;
+    //         const startMatch = audio_response.wordTimings.findIndex(
+    //             ([_, s, _e]) => s === start,
+    //         );
+    //         const endMatch = audio_response.wordTimings.findIndex(
+    //             ([_, _s, e]) => e === end,
+    //         );
 
-            console.log(`Segment ${index}:`);
-            if (startMatch !== -1) {
-                console.log(
-                    `  Start match: ${
-                        JSON.stringify(audio_response.wordTimings[startMatch])
-                    } at index ${startMatch}`,
-                );
-            }
-            if (endMatch !== -1) {
-                console.log(
-                    `  End match: ${
-                        JSON.stringify(audio_response.wordTimings[endMatch])
-                    } at index ${endMatch}`,
-                );
-            }
+    //         console.log(`Segment ${index}:`);
+    //         if (startMatch !== -1) {
+    //             console.log(
+    //                 `  Start match: ${
+    //                     JSON.stringify(audio_response.wordTimings[startMatch])
+    //                 } at index ${startMatch}`,
+    //             );
+    //         }
+    //         if (endMatch !== -1) {
+    //             console.log(
+    //                 `  End match: ${
+    //                     JSON.stringify(audio_response.wordTimings[endMatch])
+    //                 } at index ${endMatch}`,
+    //             );
+    //         }
 
-            return interval;
-        }),
-        script_segments: script_segments,
-    };
+    //         return interval;
+    //     }),
+    //     script_segments: script_segments,
+    // };
 }
