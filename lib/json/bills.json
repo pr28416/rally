@@ -1,0 +1,254 @@
+{
+    "states": [
+      {
+        "name": "Alabama",
+        "status": "PENDING",
+        "analysis": "H 172 would prohibit distribution of materially deceptive media to influence elections. It defines \"materially deceptive media\" to include AI-generated content that falsely appears to be authentic. The bill authorizes injunctive relief against violators."
+      },
+      {
+        "name": "Alaska",
+        "status": "PENDING",
+        "analysis": "H 306, H 358, and S 177 all address AI in political advertising. H 306 and S 177 require disclosure of deepfakes in campaign communications. H 358 specifically targets the use of AI to create or alter representations of a candidate's voice or likeness."
+      },
+      {
+        "name": "Arizona",
+        "status": "PENDING",
+        "analysis": "S 1078 aims to regulate fraudulent voice recordings. S 1359 and S 1515 both focus on prohibiting deceptive deepfakes in election communications. These bills would require clear disclosure of AI-generated content in political ads."
+      },
+      {
+        "name": "Arkansas",
+        "status": "NO LEGISLATION",
+        "analysis": "Arkansas currently has no pending or enacted legislation specifically addressing AI-generated political ads."
+      },
+      {
+        "name": "California",
+        "status": "PENDING",
+        "analysis": "A 2355 would require disclosure of AI use in political ads. A 2655, the \"Defending Democracy from Deepfake Deception Act,\" would require large online platforms to block deceptive AI-generated election content. A 2839 prohibits distribution of deceptive AI-altered media to influence elections."
+      },
+      {
+        "name": "Colorado",
+        "status": "ENACTED",
+        "analysis": "H 1147, now enacted, requires disclosure of deepfakes in candidate communications. It allows for civil penalties for violations and expands the authority of administrative hearing officers to enforce these rules."
+      },
+      {
+        "name": "Connecticut",
+        "status": "PENDING",
+        "analysis": "H 5450 prohibits distribution of deceptive synthetic media within 90 days of an election. S 2 includes provisions to prohibit distribution of deceptive AI-generated media concerning elections."
+      },
+      {
+        "name": "Delaware",
+        "status": "PENDING",
+        "analysis": "H 316 would make it unlawful to distribute undisclosed deepfakes within a certain period before an election, with some exceptions."
+      },
+      {
+        "name": "Florida",
+        "status": "ENACTED",
+        "analysis": "H 919, now law, requires political ads using AI to include a clear disclaimer. It provides for both criminal and civil penalties for violations."
+      },
+      {
+        "name": "Georgia",
+        "status": "FAILED",
+        "analysis": "H 986 and S 392, which would have regulated deepfakes in elections, failed to pass. These bills would have created criminal offenses for election interference using deepfakes."
+      },
+      {
+        "name": "Hawaii",
+        "status": "PENDING",
+        "analysis": "Bills are pending to require disclosure of AI use in campaign ads, but specific bill numbers were not provided in the source material."
+      },
+      {
+        "name": "Idaho",
+        "status": "NO LEGISLATION",
+        "analysis": "Idaho currently has no pending or enacted legislation specifically addressing AI-generated political ads."
+      },
+      {
+        "name": "Illinois",
+        "status": "PENDING",
+        "analysis": "Legislation is pending to regulate AI in political advertising, but specific bill numbers were not provided in the source material."
+      },
+      {
+        "name": "Indiana",
+        "status": "NO LEGISLATION",
+        "analysis": "Indiana currently has no pending or enacted legislation specifically addressing AI-generated political ads."
+      },
+      {
+        "name": "Iowa",
+        "status": "NO LEGISLATION",
+        "analysis": "Iowa currently has no pending or enacted legislation specifically addressing AI-generated political ads."
+      },
+      {
+        "name": "Kansas",
+        "status": "NO LEGISLATION",
+        "analysis": "Kansas currently has no pending or enacted legislation specifically addressing AI-generated political ads."
+      },
+      {
+        "name": "Kentucky",
+        "status": "NO LEGISLATION",
+        "analysis": "Kentucky currently has no pending or enacted legislation specifically addressing AI-generated political ads."
+      },
+      {
+        "name": "Louisiana",
+        "status": "NO LEGISLATION",
+        "analysis": "Louisiana currently has no pending or enacted legislation specifically addressing AI-generated political ads."
+      },
+      {
+        "name": "Maine",
+        "status": "NO LEGISLATION",
+        "analysis": "Maine currently has no pending or enacted legislation specifically addressing AI-generated political ads."
+      },
+      {
+        "name": "Maryland",
+        "status": "PENDING",
+        "analysis": "Legislation is pending to prohibit deceptive AI-generated content in campaign materials, but specific bill numbers were not provided in the source material."
+      },
+      {
+        "name": "Massachusetts",
+        "status": "PENDING",
+        "analysis": "Legislation is pending to regulate AI-generated political content, but specific bill numbers were not provided in the source material."
+      },
+      {
+        "name": "Michigan",
+        "status": "PENDING",
+        "analysis": "A bill is pending to require disclosure of AI in political ads, but the specific bill number was not provided in the source material."
+      },
+      {
+        "name": "Minnesota",
+        "status": "ENACTED",
+        "analysis": "Minnesota has enacted a law requiring disclosure of AI use in campaign materials, but the specific bill number was not provided in the source material."
+      },
+      {
+        "name": "Mississippi",
+        "status": "NO LEGISLATION",
+        "analysis": "Mississippi currently has no pending or enacted legislation specifically addressing AI-generated political ads."
+      },
+      {
+        "name": "Missouri",
+        "status": "NO LEGISLATION",
+        "analysis": "Missouri currently has no pending or enacted legislation specifically addressing AI-generated political ads."
+      },
+      {
+        "name": "Montana",
+        "status": "NO LEGISLATION",
+        "analysis": "Montana currently has no pending or enacted legislation specifically addressing AI-generated political ads."
+      },
+      {
+        "name": "Nebraska",
+        "status": "NO LEGISLATION",
+        "analysis": "Nebraska currently has no pending or enacted legislation specifically addressing AI-generated political ads."
+      },
+      {
+        "name": "Nevada",
+        "status": "NO LEGISLATION",
+        "analysis": "Nevada currently has no pending or enacted legislation specifically addressing AI-generated political ads."
+      },
+      {
+        "name": "New Hampshire",
+        "status": "NO LEGISLATION",
+        "analysis": "New Hampshire currently has no pending or enacted legislation specifically addressing AI-generated political ads."
+      },
+      {
+        "name": "New Jersey",
+        "status": "PENDING",
+        "analysis": "Legislation is pending to regulate AI in political advertising, but specific bill numbers were not provided in the source material."
+      },
+      {
+        "name": "New Mexico",
+        "status": "ENACTED",
+        "analysis": "New Mexico has enacted a law requiring disclosure of AI use in campaign communications, but the specific bill number was not provided in the source material."
+      },
+      {
+        "name": "New York",
+        "status": "PENDING",
+        "analysis": "Multiple bills are pending to regulate AI in political ads, but specific bill numbers were not provided in the source material."
+      },
+      {
+        "name": "North Carolina",
+        "status": "NO LEGISLATION",
+        "analysis": "North Carolina currently has no pending or enacted legislation specifically addressing AI-generated political ads."
+      },
+      {
+        "name": "North Dakota",
+        "status": "NO LEGISLATION",
+        "analysis": "North Dakota currently has no pending or enacted legislation specifically addressing AI-generated political ads."
+      },
+      {
+        "name": "Ohio",
+        "status": "PENDING",
+        "analysis": "A bill is pending to prohibit deceptive AI-generated content in campaign materials, but the specific bill number was not provided in the source material."
+      },
+      {
+        "name": "Oklahoma",
+        "status": "NO LEGISLATION",
+        "analysis": "Oklahoma currently has no pending or enacted legislation specifically addressing AI-generated political ads."
+      },
+      {
+        "name": "Oregon",
+        "status": "PENDING",
+        "analysis": "Legislation is pending to regulate use of AI in political advertising, but specific bill numbers were not provided in the source material."
+      },
+      {
+        "name": "Pennsylvania",
+        "status": "PENDING",
+        "analysis": "A bill is pending to require disclosure of AI in political ads, but the specific bill number was not provided in the source material."
+      },
+      {
+        "name": "Rhode Island",
+        "status": "PENDING",
+        "analysis": "Legislation is pending to prohibit undisclosed synthetic media in elections, but specific bill numbers were not provided in the source material."
+      },
+      {
+        "name": "South Carolina",
+        "status": "PENDING",
+        "analysis": "H 5374 and H 5393 both aim to establish property rights in an individual's likeness, which could impact AI-generated political content. H 5394 incorporates AI-generated content into existing laws on eavesdropping and voyeurism."
+      },
+      {
+        "name": "South Dakota",
+        "status": "FAILED",
+        "analysis": "S 96, which would have prohibited the use of deepfakes to influence elections, failed to pass."
+      },
+      {
+        "name": "Tennessee",
+        "status": "FAILED",
+        "analysis": "H 2185, H 2501, S 2057, and S 2386 all failed. These bills would have required disclaimers on AI-generated political content and regulated the use of deepfakes in elections."
+      },
+      {
+        "name": "Texas",
+        "status": "NO 2024 SESSION",
+        "analysis": "Texas does not have a regular legislative session in 2024."
+      },
+      {
+        "name": "Utah",
+        "status": "ENACTED",
+        "analysis": "S 131 requires disclosure of synthetic media in election communications, including both audio and visual AI-generated content."
+      },
+      {
+        "name": "Vermont",
+        "status": "NO LEGISLATION",
+        "analysis": "Vermont currently has no pending or enacted legislation specifically addressing AI-generated political ads."
+      },
+      {
+        "name": "Virginia",
+        "status": "PENDING",
+        "analysis": "S 571 is pending, which would expand defamation laws to include synthetic media and criminalize the use of deceptive audio or visual media for fraud."
+      },
+      {
+        "name": "Washington",
+        "status": "FAILED",
+        "analysis": "H 1442, which would have regulated synthetic media in campaigns for elective office, failed to pass."
+      },
+      {
+        "name": "West Virginia",
+        "status": "FAILED",
+        "analysis": "H 4963, which would have prohibited the use of deepfake technology to influence elections, failed to pass."
+      },
+      {
+        "name": "Wisconsin",
+        "status": "ENACTED",
+        "analysis": "A 664 and S 644 were introduced, with A 664 being enacted. This law requires disclosure of AI-generated content in political advertisements."
+      },
+      {
+        "name": "Wyoming",
+        "status": "FAILED",
+        "analysis": "S 51, which would have prohibited the dissemination of misleading synthetic media, failed to pass."
+      }
+    ]
+  }

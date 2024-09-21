@@ -1,0 +1,268 @@
+{
+    "voter_records": [
+      {
+        "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+        "first_name": "John",
+        "last_name": "Doe",
+        "age": 30,
+        "city": "New York City",
+        "state": "New York",
+        "party_affiliation": "Democrat",
+        "campaigns_donated_to": ["Biden 2020", "AOC 2022"],
+        "nonprofits_donated_to": ["ACLU", "Planned Parenthood"]
+      },
+      {
+        "id": "3b241101-e2bb-4255-8caf-4136c566a962",
+        "first_name": "Jane",
+        "last_name": "Smith",
+        "age": 45,
+        "city": "Los Angeles",
+        "state": "California",
+        "party_affiliation": "Republican",
+        "campaigns_donated_to": ["Trump 2020", "Elder 2021"],
+        "nonprofits_donated_to": ["NRA", "Heritage Foundation"]
+      },
+      {
+        "id": "9f7b5896-9756-4794-8018-45aa0e71cb91",
+        "first_name": "Michael",
+        "last_name": "Johnson",
+        "age": 55,
+        "city": "Chicago",
+        "state": "Illinois",
+        "party_affiliation": "Independent",
+        "campaigns_donated_to": ["Yang 2020", "Bloomberg 2020"],
+        "nonprofits_donated_to": ["Red Cross", "Doctors Without Borders"]
+      },
+      {
+        "id": "c9b5c6e4-5b8a-4c7d-8f9e-3a2b1c0d9e8f",
+        "first_name": "Emily",
+        "last_name": "Brown",
+        "age": 28,
+        "city": "Houston",
+        "state": "Texas",
+        "party_affiliation": "Libertarian",
+        "campaigns_donated_to": ["Jorgensen 2020"],
+        "nonprofits_donated_to": ["Cato Institute", "Reason Foundation"]
+      },
+      {
+        "id": "a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d",
+        "first_name": "David",
+        "last_name": "Wilson",
+        "age": 62,
+        "city": "Phoenix",
+        "state": "Arizona",
+        "party_affiliation": "Green",
+        "campaigns_donated_to": ["Hawkins 2020"],
+        "nonprofits_donated_to": ["Greenpeace", "Sierra Club"]
+      },
+      {
+        "id": "5e6f7g8h-9i0j-1k2l-3m4n-5o6p7q8r9s0t",
+        "first_name": "Sarah",
+        "last_name": "Lee",
+        "age": 39,
+        "city": "Miami",
+        "state": "Florida",
+        "party_affiliation": "Democrat",
+        "campaigns_donated_to": ["Harris 2020", "Crist 2022"],
+        "nonprofits_donated_to": ["Everytown", "Human Rights Campaign"]
+      },
+      {
+        "id": "1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+        "first_name": "Robert",
+        "last_name": "Taylor",
+        "age": 50,
+        "city": "Seattle",
+        "state": "Washington",
+        "party_affiliation": "Republican",
+        "campaigns_donated_to": ["Culp 2020"],
+        "nonprofits_donated_to": ["Wounded Warrior Project", "Salvation Army"]
+      },
+      {
+        "id": "7q8r9s0t-1u2v-3w4x-5y6z-7a8b9c0d1e2f",
+        "first_name": "Jennifer",
+        "last_name": "Garcia",
+        "age": 33,
+        "city": "Denver",
+        "state": "Colorado",
+        "party_affiliation": "Independent",
+        "campaigns_donated_to": ["Hickenlooper 2020"],
+        "nonprofits_donated_to": ["World Wildlife Fund", "Habitat for Humanity"]
+      },
+      {
+        "id": "3g4h5i6j-7k8l-9m0n-1o2p-3q4r5s6t7u8v",
+        "first_name": "William",
+        "last_name": "Martinez",
+        "age": 41,
+        "city": "Atlanta",
+        "state": "Georgia",
+        "party_affiliation": "Democrat",
+        "campaigns_donated_to": ["Warnock 2022", "Ossoff 2020"],
+        "nonprofits_donated_to": ["Southern Poverty Law Center", "NAACP"]
+      },
+      {
+        "id": "9w0x1y2z-3a4b-5c6d-7e8f-9g0h1i2j3k4l",
+        "first_name": "Linda",
+        "last_name": "Anderson",
+        "age": 57,
+        "city": "Boston",
+        "state": "Massachusetts",
+        "party_affiliation": "Republican",
+        "campaigns_donated_to": ["Baker 2018"],
+        "nonprofits_donated_to": ["Federalist Society", "Americans for Prosperity"]
+      },
+      {
+        "id": "5m6n7o8p-9q0r-1s2t-3u4v-5w6x7y8z9a0b",
+        "first_name": "James",
+        "last_name": "Thompson",
+        "age": 36,
+        "city": "Portland",
+        "state": "Oregon",
+        "party_affiliation": "Green",
+        "campaigns_donated_to": ["Stein 2016"],
+        "nonprofits_donated_to": ["Environmental Defense Fund", "Nature Conservancy"]
+      },
+      {
+        "id": "1c2d3e4f-5g6h-7i8j-9k0l-1m2n3o4p5q6r",
+        "first_name": "Patricia",
+        "last_name": "White",
+        "age": 48,
+        "city": "Las Vegas",
+        "state": "Nevada",
+        "party_affiliation": "Libertarian",
+        "campaigns_donated_to": ["Jorgensen 2020"],
+        "nonprofits_donated_to": ["Institute for Justice", "Mises Institute"]
+      },
+      {
+        "id": "7s8t9u0v-1w2x-3y4z-5a6b-7c8d9e0f1g2h",
+        "first_name": "Christopher",
+        "last_name": "Harris",
+        "age": 52,
+        "city": "Detroit",
+        "state": "Michigan",
+        "party_affiliation": "Democrat",
+        "campaigns_donated_to": ["Whitmer 2022", "Peters 2020"],
+        "nonprofits_donated_to": ["United Way", "Feeding America"]
+      },
+      {
+        "id": "3i4j5k6l-7m8n-9o0p-1q2r-3s4t5u6v7w8x",
+        "first_name": "Elizabeth",
+        "last_name": "Clark",
+        "age": 44,
+        "city": "Minneapolis",
+        "state": "Minnesota",
+        "party_affiliation": "Independent",
+        "campaigns_donated_to": ["Klobuchar 2020"],
+        "nonprofits_donated_to": ["Amnesty International", "Oxfam"]
+      },
+      {
+        "id": "9y0z1a2b-3c4d-5e6f-7g8h-9i0j1k2l3m4n",
+        "first_name": "Daniel",
+        "last_name": "Lewis",
+        "age": 29,
+        "city": "San Francisco",
+        "state": "California",
+        "party_affiliation": "Democrat",
+        "campaigns_donated_to": ["Newsom 2022", "Wiener 2020"],
+        "nonprofits_donated_to": ["Electronic Frontier Foundation", "Code for America"]
+      },
+      {
+        "id": "5o6p7q8r-9s0t-1u2v-3w4x-5y6z7a8b9c0d",
+        "first_name": "Margaret",
+        "last_name": "Walker",
+        "age": 63,
+        "city": "Dallas",
+        "state": "Texas",
+        "party_affiliation": "Republican",
+        "campaigns_donated_to": ["Cruz 2018", "Abbott 2022"],
+        "nonprofits_donated_to": ["Texas Public Policy Foundation", "First Liberty Institute"]
+      },
+      {
+        "id": "1e2f3g4h-5i6j-7k8l-9m0n-1o2p3q4r5s6t",
+        "first_name": "Thomas",
+        "last_name": "Hall",
+        "age": 37,
+        "city": "Philadelphia",
+        "state": "Pennsylvania",
+        "party_affiliation": "Democrat",
+        "campaigns_donated_to": ["Fetterman 2022", "Shapiro 2022"],
+        "nonprofits_donated_to": ["Innocence Project", "Equal Justice Initiative"]
+      },
+      {
+        "id": "7u8v9w0x-1y2z-3a4b-5c6d-7e8f9g0h1i2j",
+        "first_name": "Nancy",
+        "last_name": "Young",
+        "age": 51,
+        "city": "San Diego",
+        "state": "California",
+        "party_affiliation": "Republican",
+        "campaigns_donated_to": ["Faulconer 2021"],
+        "nonprofits_donated_to": ["Judicial Watch", "Project Veritas"]
+      },
+      {
+        "id": "3k4l5m6n-7o8p-9q0r-1s2t-3u4v5w6x7y8z",
+        "first_name": "Joseph",
+        "last_name": "Allen",
+        "age": 42,
+        "city": "Columbus",
+        "state": "Ohio",
+        "party_affiliation": "Independent",
+        "campaigns_donated_to": ["Kasich 2016"],
+        "nonprofits_donated_to": ["American Red Cross", "Doctors Without Borders"]
+      },
+      {
+        "id": "9a0b1c2d-3e4f-5g6h-7i8j-9k0l1m2n3o4p",
+        "first_name": "Lisa",
+        "last_name": "Scott",
+        "age": 35,
+        "city": "Nashville",
+        "state": "Tennessee",
+        "party_affiliation": "Libertarian",
+        "campaigns_donated_to": ["Amash 2020"],
+        "nonprofits_donated_to": ["Reason Foundation", "Foundation for Economic Education"]
+      },
+      {
+        "id": "5q6r7s8t-9u0v-1w2x-3y4z-5a6b7c8d9e0f",
+        "first_name": "Mark",
+        "last_name": "Green",
+        "age": 59,
+        "city": "Austin",
+        "state": "Texas",
+        "party_affiliation": "Democrat",
+        "campaigns_donated_to": ["O'Rourke 2022", "Castro 2020"],
+        "nonprofits_donated_to": ["Texas Civil Rights Project", "ACLU of Texas"]
+      },
+      {
+        "id": "1g2h3i4j-5k6l-7m8n-9o0p-1q2r3s4t5u6v",
+        "first_name": "Karen",
+        "last_name": "Baker",
+        "age": 47,
+        "city": "Salt Lake City",
+        "state": "Utah",
+        "party_affiliation": "Republican",
+        "campaigns_donated_to": ["Romney 2018", "Cox 2020"],
+        "nonprofits_donated_to": ["Sutherland Institute", "Utah Food Bank"]
+      },
+      {
+        "id": "7w8x9y0z-1a2b-3c4d-5e6f-7g8h9i0j1k2l",
+        "first_name": "Steven",
+        "last_name": "Adams",
+        "age": 31,
+        "city": "New Orleans",
+        "state": "Louisiana",
+        "party_affiliation": "Green",
+        "campaigns_donated_to": ["Hawkins 2020"],
+        "nonprofits_donated_to": ["Gulf Restoration Network", "Louisiana Environmental Action Network"]
+      },
+      {
+        "id": "3m4n5o6p-7q8r-9s0t-1u2v-3w4x5y6z7a8b",
+        "first_name": "Betty",
+        "last_name": "Nelson",
+        "age": 68,
+        "city": "Anchorage",
+        "state": "Alaska",
+        "party_affiliation": "Independent",
+        "campaigns_donated_to": ["Murkowski 2022"],
+        "nonprofits_donated_to": ["Alaska Conservation Foundation", "Alaska Native Heritage Center"]
+      }
+    ]
+  }

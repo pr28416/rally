@@ -10,6 +10,7 @@ export default function SidebarWrapper({
   isLoading,
   navItems,
   isDevTools = false,
+  onShuffleNext,
 }: {
   children: ReactNode
   defaultCollapsed?: boolean
@@ -18,6 +19,7 @@ export default function SidebarWrapper({
   isLoading: boolean
   navItems: NavItemType[]
   isDevTools?: boolean
+  onShuffleNext?: () => void
 }): ReactNode {
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed)
 
@@ -32,6 +34,10 @@ export default function SidebarWrapper({
         event.preventDefault()
         handleCollapse()
       }
+      if (event.key === 'j' && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault()
+        onShuffleNext?.()
+      }
     }
 
     window.addEventListener("keydown", handleKeyDown)
@@ -39,7 +45,7 @@ export default function SidebarWrapper({
     return () => {
       window.removeEventListener("keydown", handleKeyDown)
     }
-  }, [handleCollapse])
+  }, [handleCollapse, onShuffleNext])
 
   return (
     <div className="h-screen flex">

@@ -20,8 +20,10 @@ const navItems: NavItemType[] = [
 
 export default function Navbar({
   children,
+  onShuffleNext,
 }: {
   children: React.ReactNode
+  onShuffleNext?: () => void
 }): React.ReactNode | null {
   const [defaultCollapsed, setDefaultCollapsed] = useState<boolean | undefined>(undefined);
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
@@ -47,6 +49,7 @@ export default function Navbar({
         onOpenMenusChange={handleOpenMenusChange}
         isLoading={false}
         navItems={navItems}
+        onShuffleNext={onShuffleNext}
       >
         <Header/>
 
