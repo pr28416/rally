@@ -10,7 +10,7 @@ type VoterRecord = Database["public"]["Tables"]["voter_records"]["Row"];
 type CityData = Database["public"]["Tables"]["cities"]["Row"];
 type CampaignPolicy = Database["public"]["Tables"]["campaign_policies"]["Row"];
 
-const AdSegmentSchema = z.object({
+export const AdSegmentSchema = z.object({
     spoken_transcript: z.string(),
     is_b_roll: z.boolean(),
     b_roll_search_query: z.string().optional(),
