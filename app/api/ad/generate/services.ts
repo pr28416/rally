@@ -66,98 +66,194 @@ type AdjustedTimestamp = {
     is_b_roll: boolean;
     b_roll_link: string | null;
 };
+type AudioResponse = {
+    audio: string;
+    wordTimings: [string, number, number][];
+};
 
 // Main function to generate an ad for a given voter
 export async function generateAd(voter: VoterRecord) {
-    // Generate script segments based on voter information
-    const script_segments = await getScriptSegments(voter);
-    // Combine all script segments into a full transcript
-    const full_transcript = getFullTranscript(script_segments);
-
-    // Concurrently generate audio and B-roll options
-    const [audio_response, b_roll_response] = await Promise.all([
-        generateAudio(full_transcript),
-        generateBRollOptions(script_segments),
-    ]);
-
-    // Convert and save the generated audio to a temporary file
-    const { wavFile } = await convertAndSaveTempAudio(audio_response.audio);
-
-    // Construct timestamps for each segment of the script
-    const segmentTimestamps = constructSegmentTimestamps(
+    // 1. Get script segments
+    const script_segments: z.infer<typeof AdSegmentSchema>[] =
+        await getScriptSegments(voter);
+    // 2. Combine all script segments into a full transcript
+    const full_transcript: string = getFullTranscript(script_segments);
+    // 3. Generate audio from full transcript
+    const audio_response: AudioResponse = await generateAudio(full_transcript);
+    // 4. Generate B-roll options
+    const b_roll_options = await generateBRollOptions(script_segments);
+    // 5. Get b-roll timestamps
+    const b_roll_timestamps = await getBRollTimestamps(
         script_segments,
         audio_response.wordTimings,
     );
-    // Filter B-roll segments based on the script segments
-    const filteredBRollSegments = filterBRollSegments(
-        b_roll_response,
-        segmentTimestamps,
-    );
-    // Adjust timestamps to accommodate B-roll segments
-    const adjustedTimestamps = await adjustTimestamps(
-        segmentTimestamps,
-        filteredBRollSegments,
-    );
-    // Combine adjusted timestamps with B-roll segments for final timeline
-    const finalTimestamps = combineFinalTimestamps(
-        adjustedTimestamps,
-        filteredBRollSegments,
-    );
-
-    // Trim audio to segments, upload, and get public URLs for each clip
-    const audioClipPublicUrls =
-        await trim_audio_to_segments_upload_and_choose_clip(
-            wavFile,
-            finalTimestamps,
-        );
-
-    console.log("Final timestamps", finalTimestamps);
-
-    // Choose random face clips for each non b-roll segment
-    const faceClipPublicUrls = await choose_and_upload_face_clips(
-        finalTimestamps,
-        "kamala_clip_1.mp4",
-    );
-
-    // Generate videos from clips and audio
-    const videoPublicUrlPromises: Promise<GenerateVideoResponse>[] = [];
-    for (let i = 0; i < finalTimestamps.length; i++) {
-        const timestamp = finalTimestamps[i];
-        if (timestamp.is_b_roll && timestamp.b_roll_link) {
-            videoPublicUrlPromises.push(Promise.resolve({
-                resultUrl: timestamp.b_roll_link,
-                elapsedTime: 0,
-            }));
-        } else if (faceClipPublicUrls[i] && audioClipPublicUrls[i]) {
-            videoPublicUrlPromises.push(generateVideo({
-                videoUrl: faceClipPublicUrls[i]!,
-                audioUrl: audioClipPublicUrls[i]!,
-            }));
-        }
-    }
-
-    // Execute 5 promises in parallel (SyncLabs limit)
-    const videoPublicUrls: string[] =
-        (await PromiseAllBatch(videoPublicUrlPromises, 5)).map((v) =>
-            v.resultUrl
-        );
-
-    // Stitch videos
-    const stitchedVideoPublicUrl = await stitch_clips(
-        videoPublicUrls,
-        wavFile,
-    );
 
     return {
-        stitchedVideoPublicUrl: stitchedVideoPublicUrl,
-        audioClipPublicUrls: audioClipPublicUrls,
-        originalTimestamps: segmentTimestamps,
-        adjustedTimestamps: adjustedTimestamps,
-        finalTimestamps: finalTimestamps,
-        script_segments: script_segments,
-        bRollSegments: filteredBRollSegments,
+        script_segments,
+        b_roll_timestamps,
+        audio_timestamps: b_roll_timestamps.map(([start, end]) =>
+            audio_response.wordTimings.filter(([_, wordStart, wordEnd]) =>
+                wordStart >= start && wordEnd <= end
+            )
+        ),
+        b_roll_options,
     };
+    // // 5. Convert and save the generated audio to a temporary file
+    // const { wavFile } = await convertAndSaveTempAudio(audio_response.audio);
+    // // 6. Construct timestamps for each segment of the script
+    // const segmentTimestamps = constructSegmentTimestamps(
+    //     script_segments,
+    //     audio_response.wordTimings,
+    // );
+
+    // // Concurrently generate audio and B-roll options
+    // const [audio_response, b_roll_response] = await Promise.all([
+    //     generateAudio(full_transcript),
+    //     generateBRollOptions(script_segments),
+    // ]);
+
+    // // Convert and save the generated audio to a temporary file
+    // const { wavFile } = await convertAndSaveTempAudio(audio_response.audio);
+
+    // // Construct timestamps for each segment of the script
+    // const segmentTimestamps = constructSegmentTimestamps(
+    //     script_segments,
+    //     audio_response.wordTimings,
+    // );
+    // // Filter B-roll segments based on the script segments
+    // const filteredBRollSegments = filterBRollSegments(
+    //     b_roll_response,
+    //     segmentTimestamps,
+    // );
+    // // Adjust timestamps to accommodate B-roll segments
+    // const adjustedTimestamps = await adjustTimestamps(
+    //     segmentTimestamps,
+    //     filteredBRollSegments,
+    // );
+    // // Combine adjusted timestamps with B-roll segments for final timeline
+    // const finalTimestamps = combineFinalTimestamps(
+    //     adjustedTimestamps,
+    //     filteredBRollSegments,
+    // );
+
+    // // Trim audio to segments, upload, and get public URLs for each clip
+    // const audioClipPublicUrls =
+    //     await trim_audio_to_segments_upload_and_choose_clip(
+    //         wavFile,
+    //         finalTimestamps,
+    //     );
+
+    // console.log("Final timestamps", finalTimestamps);
+
+    // // Choose random face clips for each non b-roll segment
+    // const faceClipPublicUrls = await choose_and_upload_face_clips(
+    //     finalTimestamps,
+    //     "kamala_clip_1.mp4",
+    // );
+
+    // // Generate videos from clips and audio
+    // const videoPublicUrlPromises: Promise<GenerateVideoResponse>[] = [];
+    // for (let i = 0; i < finalTimestamps.length; i++) {
+    //     const timestamp = finalTimestamps[i];
+    //     if (timestamp.is_b_roll && timestamp.b_roll_link) {
+    //         videoPublicUrlPromises.push(Promise.resolve({
+    //             resultUrl: timestamp.b_roll_link,
+    //             elapsedTime: 0,
+    //         }));
+    //     } else if (faceClipPublicUrls[i] && audioClipPublicUrls[i]) {
+    //         videoPublicUrlPromises.push(generateVideo({
+    //             videoUrl: faceClipPublicUrls[i]!,
+    //             audioUrl: audioClipPublicUrls[i]!,
+    //         }));
+    //     }
+    // }
+
+    // // Execute 5 promises in parallel (SyncLabs limit)
+    // const videoPublicUrls: string[] =
+    //     (await PromiseAllBatch(videoPublicUrlPromises, 5)).map((v) =>
+    //         v.resultUrl
+    //     );
+
+    // // Stitch videos
+    // const stitchedVideoPublicUrl = await stitch_clips(
+    //     videoPublicUrls,
+    //     wavFile,
+    // );
+
+    // return {
+    //     stitchedVideoPublicUrl: stitchedVideoPublicUrl,
+    //     audioClipPublicUrls: audioClipPublicUrls,
+    //     originalTimestamps: segmentTimestamps,
+    //     adjustedTimestamps: adjustedTimestamps,
+    //     finalTimestamps: finalTimestamps,
+    //     script_segments: script_segments,
+    //     bRollSegments: filteredBRollSegments,
+    // };
 }
+
+async function getBRollTimestamps(
+    segments: z.infer<typeof AdSegmentSchema>[],
+    wordTimings: [string, number, number][],
+): Promise<[number, number][]> {
+    const bRollTimestamps: [number, number][] = [];
+    let wordTimingsIdx = 0;
+
+    for (const segment of segments) {
+        const segmentWordCount = segment.spoken_transcript.split(" ").length;
+
+        if (segment.is_b_roll) {
+            const startIdx = wordTimingsIdx;
+            const endIdx = wordTimingsIdx + segmentWordCount - 1;
+
+            if (endIdx >= wordTimings.length) {
+                throw new Error("Word timings index out of bounds");
+            }
+
+            const new_start = wordTimings[startIdx][1];
+            const new_end = wordTimings[endIdx][2];
+            bRollTimestamps.push([new_start, new_end]);
+        }
+
+        wordTimingsIdx += segmentWordCount;
+    }
+
+    return bRollTimestamps;
+}
+
+// while (segmentIdx < segments.length && wordTimingsIdx < wordTimings.length) {
+//     if (chunkIdx >= chunk.length) {
+//         segmentIdx += 1
+//         chunkIdx = 0
+//         end = wordTimings[wordTimingsIdx][1]
+//         bRollTimestamps.push([start, end])
+//     }
+//     if (segments[segmentIdx].is_b_roll) {
+//         start = wordTimings[wordTimingsIdx][1]
+//         wordTimingsIdx += 1
+//     }
+//     chunkIdx += 1
+//     wordTimingsIdx += 1
+// }
+//     if (chunkIdx >= chunk.length) {
+//         segmentIdx += 1
+//         chunkIdx = 0
+//         end = wordTimings[segmentIdx][1]
+//         bRollTimestamps.push([start, end])
+//     }
+//     if (segmentIdx >= segments.length) {
+//         throw new Error("Segment index out of bounds");
+//     }
+//     if (chunkIdx === 0) {
+//         if (is_b_roll) {
+//         start = wordTimings[segmentIdx][1]
+//         chunk = segment.spoken_transcript.split(" ")
+//     }
+
+//     if (chunk[chunkIdx].toLowerCase() !== wordTimings[segmentIdx][0].toLowerCase()) {
+//         throw new Error("Word mismatch");
+//     }
+//     chunkIdx += 1
+// }
 
 async function PromiseAllBatch<T>(
     promises: Promise<T>[],
@@ -203,12 +299,10 @@ async function generateAudio(transcript: string) {
 
 async function generateBRollOptions(
     script_segments: z.infer<typeof AdSegmentSchema>[],
-): Promise<(Video[] | null)[]> {
-    // TODO: Implement b-roll option generation
-    // Will return a list of b-roll options if slot is b-roll, otherwise empty item
+): Promise<(Video[])[]> {
     const getBRollOptions = async (
         query: string,
-    ): Promise<Video[] | null> => {
+    ): Promise<Video[]> => {
         const response = await fetch(
             `${process.env.NEXT_PUBLIC_API_URL}/api/broll`,
             {
@@ -229,13 +323,15 @@ async function generateBRollOptions(
         return data.videos;
     };
 
-    return Promise.all(script_segments.map(async (segment) => {
-        if (segment.is_b_roll && segment.b_roll_search_query) {
-            return getBRollOptions(segment.b_roll_search_query);
-        } else {
-            return Promise.resolve(null);
-        }
-    }));
+    return Promise.all(
+        script_segments
+            .filter((segment) =>
+                segment.is_b_roll && segment.b_roll_search_query
+            )
+            .map(async (segment) =>
+                getBRollOptions(segment.b_roll_search_query!)
+            ),
+    );
 }
 
 async function convertAndSaveTempAudio(

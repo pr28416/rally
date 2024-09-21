@@ -112,7 +112,8 @@ const generateScript = async (
         - Maintain a balance between candidate shots and B-roll
         - Whether or not a clip is B-roll, Kamala Harris will be speaking, so spoken_transcript should be what she says.
         - Keep the overall length to 30 seconds or less
-        - For B-roll segments, provide the b_roll_search_query as a list of 3-5 keywords, separated by commas`;
+        - For B-roll segments, provide the b_roll_search_query as a list of 3-5 keywords, separated by commas
+        - Keep it really really short. Every scene is at most 5 words.`;
 
     const overallScriptUserPrompt = [
         `Voter background: ${
@@ -149,6 +150,16 @@ const generateScript = async (
         overallScriptResponse.choices[0].message.parsed ?? {
             segments: [],
         };
+
+    // Reduce all into one segment
+    // script.segments = [
+    //     {
+    //         spoken_transcript: script.segments.map(
+    //             (segment) => segment.spoken_transcript,
+    //         ).join(" "),
+    //         is_b_roll: false,
+    //     },
+    // ];
 
     // // For debugging, change all the b-roll segments to candidate shots
     // script.segments = script.segments.map((segment) => ({

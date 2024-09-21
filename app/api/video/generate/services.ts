@@ -2,7 +2,7 @@ import { GenerateVideoRequest, GenerateVideoResponse } from "./types";
 
 async function generateVideo(
     request: GenerateVideoRequest,
-    timeout: number = 5 * 60 * 1000, // Default timeout of 5 minutes
+    timeout: number = 10 * 60 * 1000, // Default timeout of 5 minutes
 ): Promise<GenerateVideoResponse> {
     return new Promise(async (resolve, reject) => {
         const timeoutId = setTimeout(() => {
