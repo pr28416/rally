@@ -156,3 +156,32 @@ export async function generateAd(voter: VoterRecord) {
     //     script_segments: script_segments,
     // };
 }
+
+function calculateLipsyncIntervals(duration: number, brollIntervals: Float32Array[]): Float32Array[] {
+    // Initialize an array to store the lipsync intervals
+    const lipsyncIntervals: Float32Array[] = [];
+    
+    // Start with 0 as the initial timestamp
+    let previousEnd = 0;
+    
+    // Iterate through the broll intervals
+    for (let i = 0; i < brollIntervals.length; i++) {
+        const brollStart = brollIntervals[i][0];
+        const brollEnd = brollIntervals[i][1];
+        
+        // If there's a gap between previous end and current broll start, add it as a lipsync interval
+        if (brollStart > previousEnd) {
+            lipsyncIntervals.push(new Float32Array([previousEnd, brollStart]));
+        }
+        
+        // Update the previous end to the end of this broll interval
+        previousEnd = brollEnd;
+    }
+    
+    // If there's remaining time after the last broll interval, add it as a final lipsync interval
+    if (previousEnd < duration) {
+        lipsyncIntervals.push(new Float32Array([previousEnd, duration]));
+    }
+    
+    return lipsyncIntervals;
+}

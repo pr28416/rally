@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     }
 
     const data = await response.json();
-    const videos = data.videos as VideoFile[];
+    const videos = data.videos as Video[];
 
     if (!videos || videos.length === 0) {
       return NextResponse.json({ error: "No videos found" }, { status: 404 });
