@@ -439,3 +439,59 @@ async function trim_audio_to_segments_upload_and_choose_clip(
         ),
     );
 }
+
+async function choose_and_upload_face_clips(
+    timestamps: AdjustedTimestamp[],
+    videoFile: string,
+): Promise<string[]> {
+    return Promise.all(timestamps.map(async (timestamp) => {
+        const { start, end } = timestamp;
+        const videoFileClip = `${videoFile}_clip_${start}_${end}.mp4`;
+        // Get video duration
+        const durationCommand = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoFile}"`;
+        const durationOutput = await execPromise(durationCommand);
+        const videoDuration = parseFloat(durationOutput.stdout.trim());
+
+        const clipDuration = end - start;
+
+        if (clipDuration > videoDuration) {
+            throw new Error(`Clip duration (${clipDuration}s) is longer than video duration (${videoDuration}s)`);
+        }
+
+        // Choose a random start time for the clip
+        const maxStartTime = videoDuration - clipDuration;
+        const randomStartTime = Math.random() * maxStartTime;
+
+        // Extract the clip
+        const ffmpegCommand = `ffmpeg -ss ${randomStartTime} -i "${videoFile}" -t ${clipDuration} -c copy "${videoFileClip}"`;
+        await execPromise(ffmpegCommand);
+
+        // Upload the clip to Supabase
+        const fileBuffer = await fs.readFile(videoFileClip);
+        const { data, error } = await supabase.storage
+            .from('kamala-clips/kamala-segments')
+            .upload(videoFileClip, fileBuffer, {
+                contentType: 'video/mp4',
+            });
+
+        if (error) {
+            console.error(`Error uploading clip to Supabase: ${error.message}`);
+            throw error;
+        }
+
+        // Get the public URL of the uploaded clip
+        const { data: { publicUrl }, error: urlError } = supabase.storage
+            .from('kamala-clips/kamala-segments')
+            .getPublicUrl(videoFileClip);
+
+        if (urlError) {
+            console.error(`Error getting public URL for clip: ${urlError.message}`);
+            throw urlError;
+        }
+
+        // Clean up the local clip file
+        await fs.unlink(videoFileClip);
+
+        return publicUrl;
+    }));
+}
