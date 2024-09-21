@@ -46,8 +46,6 @@ export async function POST(request: Request) {
       throw new Error("Failed to generate voice");
     }
 
-    const { audio, wordTimings } = await voiceResponse.json();
-
     const bRollSegments = script.segments.filter((
       segment: z.infer<typeof AdSegmentSchema>,
     ) => segment.is_b_roll && segment.b_roll_search_query);

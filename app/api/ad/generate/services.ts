@@ -1,8 +1,14 @@
 import { Database } from "@/lib/types/schema";
 import { generateScript } from "../../script/generate/services";
-import { Video } from "../../broll/route";
+import { Video, VideoFile } from "../../broll/route";
 
 type VoterRecord = Database["public"]["Tables"]["voter_records"]["Row"];
+type AdjustedTimestamp = {
+    start: number;
+    end: number;
+    is_b_roll: boolean;
+    b_roll_link: string | null;
+};
 
 export async function generateAd(voter: VoterRecord) {
     // Get script segments
@@ -160,7 +166,7 @@ export async function generateAd(voter: VoterRecord) {
     // };
 
     // For each B-roll option, find the B-roll video that fits in the timestamp
-    const filteredBRollSegments = b_roll_response.map(
+    const filteredBRollSegments: (Video | null)[] = b_roll_response.map(
         (broll: Video[] | null, index: number) => {
             const [start, end] = segmentTimestamps[index];
             if (!broll) {
@@ -168,7 +174,9 @@ export async function generateAd(voter: VoterRecord) {
             }
             for (const video of broll) {
                 const length = end - start;
-                if (video.duration >= length - 2) {
+                if (
+                    video.duration >= length - 2 && video.video_files.length > 0
+                ) {
                     return video;
                 }
             }
@@ -177,51 +185,123 @@ export async function generateAd(voter: VoterRecord) {
     );
 
     // Adjust the timestamps now that some B-roll options are shorter than expected. If the B-roll is shorter than expected, decrease the end time of the B-roll segment and create a new segment from the end of the B-roll to the end of the original segment that is not B-roll.
-    const adjustedTimestamps = [];
+    const adjustedTimestamps: AdjustedTimestamp[] = [];
     for (let i = 0; i < segmentTimestamps.length; i++) {
         const [start, end] = segmentTimestamps[i];
         const bRoll = filteredBRollSegments[i];
-        if (bRoll && end - start > bRoll.duration) {
-            adjustedTimestamps.push([start, start + bRoll.duration]);
-            adjustedTimestamps.push([start + bRoll.duration, end]);
+        if (bRoll) {
+            if (end - start > bRoll.duration) {
+                adjustedTimestamps.push({
+                    start,
+                    end: start + bRoll.duration,
+                    is_b_roll: true,
+                    b_roll_link: bRoll.video_files[0].link,
+                });
+                adjustedTimestamps.push({
+                    start: start + bRoll.duration,
+                    end,
+                    is_b_roll: false,
+                    b_roll_link: null,
+                });
+            } else {
+                adjustedTimestamps.push({
+                    start,
+                    end,
+                    is_b_roll: true,
+                    b_roll_link: bRoll.video_files[0].link,
+                });
+            }
         } else {
-            adjustedTimestamps.push([start, end]);
+            adjustedTimestamps.push({
+                start,
+                end,
+                is_b_roll: false,
+                b_roll_link: null,
+            });
         }
     }
 
+    // Combine consecutive non-B-roll segments and adjust B-roll boundaries
+    const finalTimestamps: AdjustedTimestamp[] = [];
+    for (let i = 0; i < adjustedTimestamps.length; i++) {
+        const current = adjustedTimestamps[i];
+        const next = adjustedTimestamps[i + 1];
+
+        if (next) {
+            const currentBRoll = filteredBRollSegments[i];
+            const nextBRoll = filteredBRollSegments[i + 1];
+
+            if (!currentBRoll && !nextBRoll) {
+                // Both are non-B-roll, combine them
+                finalTimestamps.push({
+                    start: current.start,
+                    end: next.end,
+                    is_b_roll: false,
+                    b_roll_link: null,
+                });
+                i++; // Skip the next iteration
+            } else if (!currentBRoll && nextBRoll) {
+                // Current is non-B-roll, next is B-roll
+                finalTimestamps.push({
+                    start: current.start,
+                    end: next.start,
+                    is_b_roll: false,
+                    b_roll_link: null,
+                });
+            } else if (currentBRoll && !nextBRoll) {
+                // Current is B-roll, next is non-B-roll
+                finalTimestamps.push(current);
+                if (i + 1 < adjustedTimestamps.length - 1) {
+                    next.start = current.end; // Adjust start time of next segment
+                }
+            } else {
+                // Both are B-roll
+                finalTimestamps.push(current);
+            }
+        } else {
+            // Last segment
+            finalTimestamps.push(current);
+        }
+    }
+
+    // TODO: Change this. Right now it's just for testing
     return {
         originalTimestamps: segmentTimestamps,
         adjustedTimestamps: adjustedTimestamps,
+        finalTimestamps: finalTimestamps,
         script_segments: script_segments,
         bRollSegments: filteredBRollSegments,
     };
 }
 
-function calculateLipsyncIntervals(duration: number, brollIntervals: Float32Array[]): Float32Array[] {
+function calculateLipsyncIntervals(
+    duration: number,
+    brollIntervals: Float32Array[],
+): Float32Array[] {
     // Initialize an array to store the lipsync intervals
     const lipsyncIntervals: Float32Array[] = [];
-    
+
     // Start with 0 as the initial timestamp
     let previousEnd = 0;
-    
+
     // Iterate through the broll intervals
     for (let i = 0; i < brollIntervals.length; i++) {
         const brollStart = brollIntervals[i][0];
         const brollEnd = brollIntervals[i][1];
-        
+
         // If there's a gap between previous end and current broll start, add it as a lipsync interval
         if (brollStart > previousEnd) {
             lipsyncIntervals.push(new Float32Array([previousEnd, brollStart]));
         }
-        
+
         // Update the previous end to the end of this broll interval
         previousEnd = brollEnd;
     }
-    
+
     // If there's remaining time after the last broll interval, add it as a final lipsync interval
     if (previousEnd < duration) {
         lipsyncIntervals.push(new Float32Array([previousEnd, duration]));
     }
-    
+
     return lipsyncIntervals;
 }
