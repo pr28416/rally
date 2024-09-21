@@ -1,10 +1,10 @@
-import { Cartesia } from '@cartesia/cartesia-js';
+import { Cartesia, WordTimestamps } from '@cartesia/cartesia-js';
 
 export async function POST(req: Request) {
   const { transcript } = await req.json();
-  
+
   const cartesia = new Cartesia({
-    apiKey: process.env.CARTEISIA_API_KEY,
+    apiKey: "03e3d2cd-aa96-467a-b401-d2f63254ce26",
   });
 
   const websocket = await cartesia.tts.websocket({
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     model_id: "sonic-english",
     voice: {
       mode: "id",
-      id: "PUT ID HERE",
+      id: "41534e16-2966-4c6b-9670-111411def906",
     },
     transcript: transcript,
     add_timestamps: true
@@ -32,15 +32,38 @@ export async function POST(req: Request) {
   let base64Audio = '';
   const wordTimings: [string, number, number][] = [];
 
-  for await (const message of response.events(["message", "timestamps"])) {
-    if (typeof message === 'string') {
-      base64Audio += message;
-    } else if ('words' in message && 'start' in message && 'end' in message) {
-      const { words, start, end } = message;
-      for (let i = 0; i < words.length; i++) {
-        wordTimings.push([words[i], start[i], end[i]]);
+  try {
+    console.log("hello there");
+    for await (const message of response.events(["message", "timestamps"])) {
+      console.log("Received message:", message); // Log the raw message for debugging
+      if (typeof message === 'string') {
+        try {
+          const messageObj = JSON.parse(message);
+          if (messageObj.error) {
+            throw new Error(messageObj.error);
+          }
+
+          if (messageObj.done === true) {
+            break;
+          }
+
+          if (messageObj.type === "chunk") {
+            base64Audio += messageObj.data;
+          }
+        } catch (parseError) {
+          console.warn(`Failed to parse message as JSON: ${parseError}. Message: ${message}`);
+          // Skip this message and continue with the next one
+          continue;
+        }
+      } else if (typeof message === 'object') {
+        const messageObj = message as WordTimestamps;
+        for (let i = 0; i < messageObj.words.length; i++) {
+          wordTimings.push([messageObj.words[i], messageObj.start[i], messageObj.end[i]]);
+        }
       }
     }
+  } catch (error) {
+    console.error(`Error processing Cartesia response: ${error}`);
   }
 
   // Disconnect the WebSocket after processing
@@ -55,5 +78,4 @@ export async function POST(req: Request) {
       'Content-Type': 'application/json'
     }
   });
-
 }
