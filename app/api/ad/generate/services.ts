@@ -24,10 +24,10 @@ async function safeExecPromise(command: string): Promise<string> {
 
     while (retries < maxRetries) {
         try {
-            const { stdout, stderr } = await execPromise(command);
-            if (stderr) {
-                console.warn(`FFmpeg command produced stderr: ${stderr}`);
-            }
+            const { stdout } = await execPromise(command);
+            // if (stderr) {
+            //     console.warn(`FFmpeg command produced stderr: ${stderr}`);
+            // }
             return stdout;
         } catch (error) {
             console.error(
@@ -110,6 +110,8 @@ export async function generateAd(voter: VoterRecord) {
             wavFile,
             finalTimestamps,
         );
+
+    console.log("Final timestamps", finalTimestamps);
 
     // Choose random face clips for each non b-roll segment
     const faceClipPublicUrls = await choose_and_upload_face_clips(
@@ -517,11 +519,21 @@ async function choose_and_upload_face_clips(
             throw new Error(`Error downloading video file: ${error.message}`);
         }
 
+        if (!data) {
+            throw new Error("No data received when downloading video file");
+        }
+
         await fs.writeFile(
             localVideoPath,
             Buffer.from(await data.arrayBuffer()),
         );
         console.log(`Video file downloaded to: ${localVideoPath}`);
+
+        // Verify the file exists and has content
+        const stats = await fs.stat(localVideoPath);
+        if (stats.size === 0) {
+            throw new Error("Downloaded video file is empty");
+        }
 
         const durationCommand =
             `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${localVideoPath}"`;
@@ -553,6 +565,14 @@ async function choose_and_upload_face_clips(
                 `ffmpeg -ss ${randomStartTime} -i "${localVideoPath}" -t ${clipDuration} -c copy "${videoFileClip}"`;
             await safeExecPromise(ffmpegCommand);
 
+            // Verify the clip file exists and has content
+            const clipStats = await fs.stat(videoFileClip);
+            if (clipStats.size === 0) {
+                throw new Error(
+                    `Generated clip file is empty: ${videoFileClip}`,
+                );
+            }
+
             const fileBuffer = await fs.readFile(videoFileClip);
             const { error: uploadError } = await supabase.storage
                 .from("video-files/kamala-segments")
@@ -578,9 +598,6 @@ async function choose_and_upload_face_clips(
     } catch (error) {
         console.error("Error in choose_and_upload_face_clips:", error);
         return timestamps.map(() => null);
-    } finally {
-        // Clean up temporary directory and files
-        await fs.rm(tempDir, { recursive: true, force: true });
     }
 }
 
