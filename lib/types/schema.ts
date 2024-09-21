@@ -108,6 +108,42 @@ export type Database = {
         }
         Relationships: []
       }
+      voter_records: {
+        Row: {
+          age: number | null
+          campaigns_donated_to: string[] | null
+          city: string | null
+          first_name: string
+          id: string
+          last_name: string
+          nonprofits_donated_to: string[] | null
+          party_affiliation: string | null
+          state: string | null
+        }
+        Insert: {
+          age?: number | null
+          campaigns_donated_to?: string[] | null
+          city?: string | null
+          first_name: string
+          id?: string
+          last_name: string
+          nonprofits_donated_to?: string[] | null
+          party_affiliation?: string | null
+          state?: string | null
+        }
+        Update: {
+          age?: number | null
+          campaigns_donated_to?: string[] | null
+          city?: string | null
+          first_name?: string
+          id?: string
+          last_name?: string
+          nonprofits_donated_to?: string[] | null
+          party_affiliation?: string | null
+          state?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -116,7 +152,28 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      topic_enum:
+        | "Immigration"
+        | "Gun Rights"
+        | "Healthcare"
+        | "Climate Change"
+        | "Economy"
+        | "Education"
+        | "National Security"
+        | "Tax Policy"
+        | "Social Security"
+        | "Abortion"
+        | "Civil Rights"
+        | "Criminal Justice Reform"
+        | "Foreign Policy"
+        | "Voting Rights"
+        | "Labor Rights"
+        | "LGBTQ+ Rights"
+        | "Drug Policy"
+        | "Infrastructure"
+        | "Trade Policy"
+        | "Government Spending"
+        | "Other"
     }
     CompositeTypes: {
       [_ in never]: never
