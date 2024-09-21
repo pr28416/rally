@@ -7,6 +7,7 @@ import util from "util";
 import path from "path";
 import os from "os";
 import { promises as fs } from "fs";
+import { v4 as uuidv4 } from "uuid";
 
 const execPromise = util.promisify(exec);
 
@@ -17,6 +18,59 @@ type AdjustedTimestamp = {
     is_b_roll: boolean;
     b_roll_link: string | null;
 };
+
+async function stitch_clips(
+    clipUrls: string[],
+    audioBase64: string,
+): Promise<string> {
+    const tempDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), "video-stitching-"),
+    );
+    const outputFile = path.join(tempDir, `output_${uuidv4()}.mp4`);
+    const audioFile = path.join(tempDir, "audio.wav");
+    const concatFile = path.join(tempDir, "concat.txt");
+    let videoFiles: string[] = [];
+
+    try {
+        // Download video clips
+        const downloadPromises = clipUrls.map(async (url, index) => {
+            const response = await fetch(url);
+            const arrayBuffer = await response.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            const filePath = path.join(tempDir, `clip_${index}.mp4`);
+            await fs.writeFile(filePath, buffer);
+            return filePath;
+        });
+        videoFiles = await Promise.all(downloadPromises);
+
+        // Create concat file
+        const concatContent = videoFiles.map((file) => `file '${file}'`).join(
+            "\n",
+        );
+        await fs.writeFile(concatFile, concatContent);
+
+        // Save audio file
+        const audioBuffer = Buffer.from(audioBase64, "base64");
+        await fs.writeFile(audioFile, audioBuffer);
+
+        // Stitch videos and add audio
+        const ffmpegCommand =
+            `ffmpeg -f concat -safe 0 -i "${concatFile}" -i "${audioFile}" -c:v libx264 -c:a aac -map 0:v -map 1:a -shortest "${outputFile}"`;
+        await execPromise(ffmpegCommand);
+
+        // Return the path to the output file
+        return outputFile;
+    } catch (error) {
+        console.error("Error in stitch_clips:", error);
+        throw error;
+    } finally {
+        // Clean up temporary files (except the output file)
+        const filesToDelete = [audioFile, concatFile, ...videoFiles];
+        await Promise.all(
+            filesToDelete.map((file) => fs.unlink(file).catch(() => {})),
+        );
+    }
+}
 
 export async function generateAd(voter: VoterRecord) {
     // Get script segments
@@ -88,39 +142,41 @@ export async function generateAd(voter: VoterRecord) {
         b_roll_promise(),
     ]);
 
-    const convert_save_temp_audio_promise: Promise<{wavFile: string}> = async () => {
-        // Decode base64 audio string
-        const audioBuffer = Buffer.from(audio_response.audio, 'base64');
+    const convert_save_temp_audio_promise: Promise<{ wavFile: string }> =
+        async () => {
+            // Decode base64 audio string
+            const audioBuffer = Buffer.from(audio_response.audio, "base64");
 
-        // Generate a unique filename
-        const filename = `audio_${Date.now()}`;
-        console.log("filename", filename);
+            // Generate a unique filename
+            const filename = `audio_${Date.now()}`;
+            console.log("filename", filename);
 
-        const tempDir = await fs.mkdtemp(
-            path.join(os.tmpdir(), "video-processing-"),
-          );
-          console.log("tempDir", tempDir);
+            const tempDir = await fs.mkdtemp(
+                path.join(os.tmpdir(), "video-processing-"),
+            );
+            console.log("tempDir", tempDir);
 
-        // Save the PCM file locally
-        const localPcmPath = path.join(tempDir, `${filename}.pcm`);
-        console.log("localPcmPath", localPcmPath);
-        await fs.writeFile(localPcmPath, audioBuffer);
+            // Save the PCM file locally
+            const localPcmPath = path.join(tempDir, `${filename}.pcm`);
+            console.log("localPcmPath", localPcmPath);
+            await fs.writeFile(localPcmPath, audioBuffer);
 
-        // Run ffmpeg command to convert PCM to WAV
-        const localWAvPath = path.join(tempDir, `${filename}.wav`);
-        console.log("localWAvPath", localWAvPath);
-        const ffmpegCommand = `ffmpeg -f f32le -i "${localPcmPath}" "${localWAvPath}"`;
-        console.log("ffmpegCommand", ffmpegCommand);
-        await execPromise(ffmpegCommand);
+            // Run ffmpeg command to convert PCM to WAV
+            const localWAvPath = path.join(tempDir, `${filename}.wav`);
+            console.log("localWAvPath", localWAvPath);
+            const ffmpegCommand =
+                `ffmpeg -f f32le -i "${localPcmPath}" "${localWAvPath}"`;
+            console.log("ffmpegCommand", ffmpegCommand);
+            await execPromise(ffmpegCommand);
 
-        const wavFileStats = await fs.stat(localWAvPath);
-        console.log("WAV file size:", wavFileStats.size);
+            const wavFileStats = await fs.stat(localWAvPath);
+            console.log("WAV file size:", wavFileStats.size);
 
-        // Return the filenames for further use if needed
-        return {
-            wavFile: `${filename}.wav`,
+            // Return the filenames for further use if needed
+            return {
+                wavFile: `${filename}.wav`,
+            };
         };
-    }
 
     // Construct timestamp'd script_segments
     const segmentTimestamps: [number, number][] = [];
@@ -174,38 +230,6 @@ export async function generateAd(voter: VoterRecord) {
     if (segmentIndex < script_segments.length) {
         throw new Error("Generated audio is shorter than the script");
     }
-
-    // Test current implementation
-    // return {
-    //     wordTimings: segmentTimestamps.map((interval, index) => {
-    //         const [start, end] = interval;
-    //         const startMatch = audio_response.wordTimings.findIndex(
-    //             ([_, s, _e]) => s === start,
-    //         );
-    //         const endMatch = audio_response.wordTimings.findIndex(
-    //             ([_, _s, e]) => e === end,
-    //         );
-
-    //         console.log(`Segment ${index}:`);
-    //         if (startMatch !== -1) {
-    //             console.log(
-    //                 `  Start match: ${
-    //                     JSON.stringify(audio_response.wordTimings[startMatch])
-    //                 } at index ${startMatch}`,
-    //             );
-    //         }
-    //         if (endMatch !== -1) {
-    //             console.log(
-    //                 `  End match: ${
-    //                     JSON.stringify(audio_response.wordTimings[endMatch])
-    //                 } at index ${endMatch}`,
-    //             );
-    //         }
-
-    //         return interval;
-    //     }),
-    //     script_segments: script_segments,
-    // };
 
     // For each B-roll option, find the B-roll video that fits in the timestamp
     const filteredBRollSegments: (Video | null)[] = b_roll_response.map(
@@ -352,37 +376,47 @@ async function trim_audio_to_segments_upload_and_choose_clip(
     wavFile: string,
     timestamps: AdjustedTimestamp[],
 ): Promise<string[]> {
-    return Promise.all(timestamps.filter(timestamp => !timestamp.is_b_roll).map(async (timestamp) => {
-        const { start, end } = timestamp;
-        const fileName = `${wavFile}_trimmed_${start}_${end}.wav`;
-        const ffmpegCommand = `ffmpeg -i "${wavFile}" -ss ${start} -to ${end} -c copy "${fileName}"`;
-        await execPromise(ffmpegCommand);
-        // Upload the trimmed audio file to Supabase
-        const fileBuffer = await fs.readFile(fileName);
-        const { data, error } = await supabase.storage
-            .from('audio-files')
-            .upload(fileName, fileBuffer, {
-                contentType: 'audio/wav',
-            });
+    return Promise.all(
+        timestamps.filter((timestamp) => !timestamp.is_b_roll).map(
+            async (timestamp) => {
+                const { start, end } = timestamp;
+                const fileName = `${wavFile}_trimmed_${start}_${end}.wav`;
+                const ffmpegCommand =
+                    `ffmpeg -i "${wavFile}" -ss ${start} -to ${end} -c copy "${fileName}"`;
+                await execPromise(ffmpegCommand);
+                // Upload the trimmed audio file to Supabase
+                const fileBuffer = await fs.readFile(fileName);
+                const { data, error } = await supabase.storage
+                    .from("audio-files")
+                    .upload(fileName, fileBuffer, {
+                        contentType: "audio/wav",
+                    });
 
-        if (error) {
-            console.error(`Error uploading file to Supabase: ${error.message}`);
-            throw error;
-        }
+                if (error) {
+                    console.error(
+                        `Error uploading file to Supabase: ${error.message}`,
+                    );
+                    throw error;
+                }
 
-        // Get the public URL of the uploaded file
-        const { data: { publicUrl }, error: urlError } = supabase.storage
-            .from('audio-files')
-            .getPublicUrl(fileName);
+                // Get the public URL of the uploaded file
+                const { data: { publicUrl }, error: urlError } = supabase
+                    .storage
+                    .from("audio-files")
+                    .getPublicUrl(fileName);
 
-        if (urlError) {
-            console.error(`Error getting public URL: ${urlError.message}`);
-            throw urlError;
-        }
+                if (urlError) {
+                    console.error(
+                        `Error getting public URL: ${urlError.message}`,
+                    );
+                    throw urlError;
+                }
 
-        // Clean up the local trimmed file
-        await fs.unlink(fileName);
+                // Clean up the local trimmed file
+                await fs.unlink(fileName);
 
-        return publicUrl;
-    }));
+                return publicUrl;
+            },
+        ),
+    );
 }
