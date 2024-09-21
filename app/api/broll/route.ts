@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 const PEXELS_API_KEY = process.env.PEXELS_API_KEY;
 const PEXELS_API_URL = "https://api.pexels.com/videos/search";
 
-interface VideoFile {
+export interface VideoFile {
   id: number;
   quality: string;
   file_type: string;
@@ -13,7 +13,7 @@ interface VideoFile {
   link: string;
 }
 
-interface Video {
+export interface Video {
   id: number;
   width: number;
   height: number;
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     }
 
     const data = await response.json();
-    const videos = data.videos as Video[];
+    const videos: Video[] = data.videos;
 
     if (!videos || videos.length === 0) {
       return NextResponse.json({ error: "No videos found" }, { status: 404 });

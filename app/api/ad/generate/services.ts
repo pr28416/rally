@@ -1,5 +1,6 @@
 import { Database } from "@/lib/types/schema";
 import { generateScript } from "../../script/generate/services";
+import { Video } from "../../broll/route";
 
 type VoterRecord = Database["public"]["Tables"]["voter_records"]["Row"];
 
@@ -33,10 +34,12 @@ export async function generateAd(voter: VoterRecord) {
         return { audio, wordTimings };
     };
 
-    const b_roll_promise = async () => {
+    const b_roll_promise = async (): Promise<(Video[] | null)[]> => {
         // TODO: Implement b-roll option generation
         // Will return a list of b-roll options if slot is b-roll, otherwise empty item
-        const getBRollOptions = async (query: string) => {
+        const getBRollOptions = async (
+            query: string,
+        ): Promise<Video[] | null> => {
             const response = await fetch(
                 `${process.env.NEXT_PUBLIC_API_URL}/api/broll`,
                 {
@@ -53,7 +56,7 @@ export async function generateAd(voter: VoterRecord) {
                 return [];
             }
 
-            const data = await response.json();
+            const data: { videos: Video[] } = await response.json();
             return data.videos;
         };
 
@@ -155,6 +158,43 @@ export async function generateAd(voter: VoterRecord) {
     //     }),
     //     script_segments: script_segments,
     // };
+
+    // For each B-roll option, find the B-roll video that fits in the timestamp
+    const filteredBRollSegments = b_roll_response.map(
+        (broll: Video[] | null, index: number) => {
+            const [start, end] = segmentTimestamps[index];
+            if (!broll) {
+                return null;
+            }
+            for (const video of broll) {
+                const length = end - start;
+                if (video.duration >= length - 2) {
+                    return video;
+                }
+            }
+            return null;
+        },
+    );
+
+    // Adjust the timestamps now that some B-roll options are shorter than expected. If the B-roll is shorter than expected, decrease the end time of the B-roll segment and create a new segment from the end of the B-roll to the end of the original segment that is not B-roll.
+    const adjustedTimestamps = [];
+    for (let i = 0; i < segmentTimestamps.length; i++) {
+        const [start, end] = segmentTimestamps[i];
+        const bRoll = filteredBRollSegments[i];
+        if (bRoll && end - start > bRoll.duration) {
+            adjustedTimestamps.push([start, start + bRoll.duration]);
+            adjustedTimestamps.push([start + bRoll.duration, end]);
+        } else {
+            adjustedTimestamps.push([start, end]);
+        }
+    }
+
+    return {
+        originalTimestamps: segmentTimestamps,
+        adjustedTimestamps: adjustedTimestamps,
+        script_segments: script_segments,
+        bRollSegments: filteredBRollSegments,
+    };
 }
 
 function calculateLipsyncIntervals(duration: number, brollIntervals: Float32Array[]): Float32Array[] {
