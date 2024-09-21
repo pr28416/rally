@@ -1,10 +1,10 @@
-import { Cartesia, WordTimestamps } from '@cartesia/cartesia-js';
+import { Cartesia, WordTimestamps } from "@cartesia/cartesia-js";
 
 export async function POST(req: Request) {
   const { transcript } = await req.json();
 
   const cartesia = new Cartesia({
-    apiKey: "03e3d2cd-aa96-467a-b401-d2f63254ce26",
+    apiKey: process.env.CARTEISIA_API_KEY,
   });
 
   const websocket = await cartesia.tts.websocket({
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     console.log("hello there");
     for await (const message of response.events(["message", "timestamps"])) {
       console.log("Received message:", message); // Log the raw message for debugging
-      if (typeof message === 'string') {
+      if (typeof message === "string") {
         try {
           const messageObj = JSON.parse(message);
           if (messageObj.error) {
@@ -55,14 +55,20 @@ export async function POST(req: Request) {
             base64Audio += messageObj.data;
           }
         } catch (parseError) {
-          console.warn(`Failed to parse message as JSON: ${parseError}. Message: ${message}`);
+          console.warn(
+            `Failed to parse message as JSON: ${parseError}. Message: ${message}`,
+          );
           // Skip this message and continue with the next one
           continue;
         }
-      } else if (typeof message === 'object') {
+      } else if (typeof message === "object") {
         const messageObj = message as WordTimestamps;
         for (let i = 0; i < messageObj.words.length; i++) {
-          wordTimings.push([messageObj.words[i], messageObj.start[i], messageObj.end[i]]);
+          wordTimings.push([
+            messageObj.words[i],
+            messageObj.start[i],
+            messageObj.end[i],
+          ]);
         }
       }
     }
@@ -76,12 +82,15 @@ export async function POST(req: Request) {
   websocket.disconnect();
 
   // Return the base64 audio string and word timings
-  return new Response(JSON.stringify({
-    audio: base64Audio,
-    wordTimings: wordTimings
-  }), {
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  });
+  return new Response(
+    JSON.stringify({
+      audio: base64Audio,
+      wordTimings: wordTimings,
+    }),
+    {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+  );
 }
