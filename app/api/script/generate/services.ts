@@ -9,7 +9,7 @@ type VoterRecord = Database["public"]["Tables"]["voter_records"]["Row"];
 type CityData = Database["public"]["Tables"]["cities"]["Row"];
 type CampaignPolicy = Database["public"]["Tables"]["campaign_policies"]["Row"];
 
-const AdSegmentSchema = z.object({
+export const AdSegmentSchema = z.object({
     spoken_transcript: z.string(),
     is_b_roll: z.boolean(),
     b_roll_search_query: z.string().optional(),
@@ -103,7 +103,8 @@ const generateScript = async (
         Guidelines:
         - Maintain a balance between candidate shots and B-roll
         - Whether or not a clip is B-roll, Kamala Harris will be speaking, so spoken_transcript should be what she says.
-        - Keep the overall length to 45 seconds or less`;
+        - Keep the overall length to 45 seconds or less
+        - For B-roll segments, provide the b_roll_search_query as a list of 3-5 keywords, separated by commas`;
 
     const overallScriptUserPrompt = [
         `Voter background: ${

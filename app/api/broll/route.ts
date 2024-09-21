@@ -1,5 +1,3 @@
-// app/api/search-videos/route.ts
-
 import { NextResponse } from 'next/server';
 
 const PEXELS_API_KEY = process.env.PEXELS_API_KEY;
@@ -39,15 +37,18 @@ interface Video {
 
 export async function POST(request: Request) {
   try {
-    const { query } = await request.json();
+    const { query, duration } = await request.json();
 
-    if (!query || typeof query !== 'string') {
-      return NextResponse.json({ error: 'Invalid query' }, { status: 400 });
+    if (!query || typeof query !== 'string' || !duration || typeof duration !== 'number') {
+      return NextResponse.json({ error: 'Invalid query or duration' }, { status: 400 });
     }
 
     const url = new URL(PEXELS_API_URL);
     url.searchParams.append('query', query);
-    url.searchParams.append('per_page', '5');
+    url.searchParams.append('per_page', '10');
+    url.searchParams.append('orientation', 'landscape');
+    url.searchParams.append('size', 'medium');
+    url.searchParams.append('locale', 'en-US');
 
     const headers: HeadersInit = {};
     if (PEXELS_API_KEY) {
@@ -64,12 +65,23 @@ export async function POST(request: Request) {
 
     const data = await response.json();
 
-    const videoUrls = data.videos.map((video: Video) => {
-      const hdFile = video.video_files.find((file: VideoFile) => file.quality === 'hd');
-      return hdFile ? hdFile.link : null;
-    }).filter(Boolean);
+    const selectedVideo = data.videos.reverse().find((video: Video) => {
+      const videoDuration = video.duration;
+      return Math.abs(videoDuration - duration) <= 3;
+    });
 
-    return NextResponse.json({ videoUrls });
+    if (!selectedVideo) {
+      return NextResponse.json({ error: 'No suitable video found' }, { status: 404 });
+    }
+
+    const hdFile = selectedVideo.video_files.find((file: VideoFile) => file.quality === 'hd');
+    const videoUrl = hdFile ? hdFile.link : null;
+
+    if (!videoUrl) {
+      return NextResponse.json({ error: 'No HD video file found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ videoUrl });
   } catch (error) {
     console.error('Error searching videos:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
