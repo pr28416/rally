@@ -175,13 +175,9 @@ export async function generateAd(voter: VoterRecord) {
 
         // Return the filenames for further use if needed
         return {
-            wavFile: `${filename}.wav`,
+            wavFile: localWAVPath,
         };
     };
-
-    // Start the audio conversion process in the background so it's ready later
-    const wavFilePromise: Promise<{ wavFile: string }> =
-        convert_save_temp_audio_promise();
 
     // Construct timestamp'd script_segments
     const segmentTimestamps: [number, number][] = [];
@@ -335,7 +331,10 @@ export async function generateAd(voter: VoterRecord) {
         }
     }
 
-    const { wavFile } = await wavFilePromise;
+    // Start the audio conversion process
+    console.log("Starting audio conversion process");
+    const { wavFile } = await convert_save_temp_audio_promise();
+    console.log("Audio conversion process completed");
 
     // Trim audio to segments and upload to Supabase. Each element will be a public URL to the audio clip if the clip is not a B-roll, otherwise it's null. Thus, this will be an array of length finalTimestamps.length.
     const audioClipPublicUrls: (string | null)[] =
@@ -394,6 +393,7 @@ async function trim_audio_to_segments_upload_and_choose_clip(
     return Promise.all(
         timestamps.map(
             async (timestamp) => {
+                console.log("Trimming audio to segment", timestamp);
                 // If B-roll, we're not running SyncLab on it, so we don't need an audio clip url.
                 if (timestamp.is_b_roll) {
                     return null;
@@ -402,6 +402,7 @@ async function trim_audio_to_segments_upload_and_choose_clip(
                 const fileName = `${wavFile}_trimmed_${start}_${end}.wav`;
                 const ffmpegCommand =
                     `ffmpeg -i "${wavFile}" -ss ${start} -to ${end} -c copy "${fileName}"`;
+                console.log("ffmpegCommand", ffmpegCommand);
                 await execPromise(ffmpegCommand);
                 // Upload the trimmed audio file to Supabase
                 const fileBuffer = await fs.readFile(fileName);
@@ -410,7 +411,7 @@ async function trim_audio_to_segments_upload_and_choose_clip(
                     .upload(fileName, fileBuffer, {
                         contentType: "audio/wav",
                     });
-
+                console.log("Uploaded audio to Supabase");
                 if (error) {
                     console.error(
                         `Error uploading file to Supabase: ${error.message}`,
@@ -423,7 +424,7 @@ async function trim_audio_to_segments_upload_and_choose_clip(
                     .storage
                     .from("audio-files")
                     .getPublicUrl(fileName);
-
+                console.log("Got public URL", publicUrl);
                 if (!publicUrl) {
                     console.error(
                         `Error getting public URL`,
@@ -433,7 +434,7 @@ async function trim_audio_to_segments_upload_and_choose_clip(
 
                 // Clean up the local trimmed file
                 await fs.unlink(fileName);
-
+                console.log("Cleaned up local trimmed file");
                 return publicUrl;
             },
         ),
