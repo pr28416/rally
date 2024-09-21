@@ -67,20 +67,20 @@ export async function generateAd(voter: VoterRecord) {
             finalTimestamps,
         );
 
-    console.log(
-        "audioClipPublicUrls",
-        audioClipPublicUrls,
-        "\nfinalTimestamps",
-        finalTimestamps,
-        "\nadjustedTimestamps",
-        adjustedTimestamps,
-        "\nsegmentTimestamps",
-        segmentTimestamps,
-        "\nfilteredBRollSegments",
-        filteredBRollSegments,
-        "\nscript_segments",
-        script_segments,
-    );
+    // console.log(
+    //     "audioClipPublicUrls",
+    //     audioClipPublicUrls,
+    //     "\nfinalTimestamps",
+    //     finalTimestamps,
+    //     "\nadjustedTimestamps",
+    //     adjustedTimestamps,
+    //     "\nsegmentTimestamps",
+    //     segmentTimestamps,
+    //     "\nfilteredBRollSegments",
+    //     filteredBRollSegments,
+    //     "\nscript_segments",
+    //     script_segments,
+    // );
 
     // TODO: Change this. Right now it's just for testing
     // Return an object with all generated data for further processing or testing
@@ -423,6 +423,30 @@ async function choose_and_upload_face_clips(
     timestamps: AdjustedTimestamp[],
     videoFile: string,
 ): Promise<string[]> {
+    // Download video file to local tmp directory
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'video-processing-'));
+    const localVideoPath = path.join(tempDir, 'input_video.mp4');
+    
+    try {
+        const { data, error } = await supabase.storage
+            .from('kamala-clips')
+            .download(videoFile);
+
+        if (error) {
+            throw new Error(`Error downloading video file: ${error.message}`);
+        }
+
+        const arrayBuffer = await data.arrayBuffer();
+        await fs.writeFile(localVideoPath, Buffer.from(arrayBuffer));
+        console.log(`Video file downloaded to: ${localVideoPath}`);
+
+        // Update videoFile variable to use the local path
+        videoFile = localVideoPath;
+    } catch (error) {
+        console.error('Error in downloading video file:', error);
+        throw error;
+    }
+    
     return Promise.all(timestamps.map(async (timestamp) => {
         const { start, end } = timestamp;
         const videoFileClip = `${videoFile}_clip_${start}_${end}.mp4`;
@@ -481,13 +505,12 @@ async function choose_and_upload_face_clips(
 
 async function stitch_clips(
     clipUrls: string[],
-    audioBase64: string,
+    audioFile: string,
 ): Promise<string> {
     const tempDir = await fs.mkdtemp(
         path.join(os.tmpdir(), "video-stitching-"),
     );
     const outputFile = path.join(tempDir, `output_${uuidv4()}.mp4`);
-    const audioFile = path.join(tempDir, "audio.wav");
     const concatFile = path.join(tempDir, "concat.txt");
     let videoFiles: string[] = [];
 
@@ -509,13 +532,9 @@ async function stitch_clips(
         );
         await fs.writeFile(concatFile, concatContent);
 
-        // Save audio file
-        const audioBuffer = Buffer.from(audioBase64, "base64");
-        await fs.writeFile(audioFile, audioBuffer);
-
         // Stitch videos and add audio
         const ffmpegCommand =
-            `ffmpeg -f concat -safe 0 -i "${concatFile}" -i "${audioFile}" -c:v libx264 -c:a aac -map 0:v -map 1:a -shortest "${outputFile}"`;
+            `ffmpeg -f concat -safe 0 -i "${concatFile}" -i "${audioFile}" -c:v libx264 -c:a aac -map 0:v -map 1:a -shortest -af "aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=mono" "${outputFile}"`;
         await execPromise(ffmpegCommand);
 
         // Return the path to the output file
