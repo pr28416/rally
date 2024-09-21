@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   const websocket = await cartesia.tts.websocket({
     container: "raw",
     encoding: "pcm_f32le",
-    sampleRate: 44100
+    sampleRate: 44100,
   });
 
   try {
@@ -19,6 +19,8 @@ export async function POST(req: Request) {
     console.error(`Failed to connect to Cartesia: ${error}`);
   }
 
+  console.log("Connected to Cartesia");
+
   const response = await websocket.send({
     model_id: "sonic-english",
     voice: {
@@ -26,11 +28,13 @@ export async function POST(req: Request) {
       id: "41534e16-2966-4c6b-9670-111411def906",
     },
     transcript: transcript,
-    add_timestamps: true
+    add_timestamps: true,
   });
 
-  let base64Audio = '';
+  let base64Audio = "";
   const wordTimings: [string, number, number][] = [];
+
+  console.log("Response received from Cartesia");
 
   try {
     console.log("hello there");
@@ -65,6 +69,8 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error(`Error processing Cartesia response: ${error}`);
   }
+
+  console.log("Disconnecting from Cartesia");
 
   // Disconnect the WebSocket after processing
   websocket.disconnect();
