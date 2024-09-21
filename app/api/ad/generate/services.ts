@@ -355,7 +355,7 @@ async function trim_audio_to_segments_upload_and_choose_clip(
     return Promise.all(timestamps.filter(timestamp => !timestamp.is_b_roll).map(async (timestamp) => {
         const { start, end } = timestamp;
         const fileName = `${wavFile}_trimmed_${start}_${end}.wav`;
-        const ffmpegCommand = `ffmpeg -i "${wavFile}" -ss ${start} -to ${end} -c copy "${outputFile}"`;
+        const ffmpegCommand = `ffmpeg -i "${wavFile}" -ss ${start} -to ${end} -c copy "${fileName}"`;
         await execPromise(ffmpegCommand);
         // Upload the trimmed audio file to Supabase
         const fileBuffer = await fs.readFile(fileName);
