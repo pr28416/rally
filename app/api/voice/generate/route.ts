@@ -39,10 +39,11 @@ export async function POST(req: Request) {
   try {
     console.log("hello there");
     for await (const message of response.events(["message", "timestamps"])) {
-      console.log("Received message:", message); // Log the raw message for debugging
+      // console.log("Received message:", message); // Log the raw message for debugging
       if (typeof message === "string") {
         try {
           const messageObj = JSON.parse(message);
+          // console.log("messageObj", messageObj);
           if (messageObj.error) {
             throw new Error(messageObj.error);
           }
@@ -62,6 +63,7 @@ export async function POST(req: Request) {
           continue;
         }
       } else if (typeof message === "object") {
+        console.log("message", message);
         const messageObj = message as WordTimestamps;
         for (let i = 0; i < messageObj.words.length; i++) {
           wordTimings.push([
@@ -82,15 +84,8 @@ export async function POST(req: Request) {
   websocket.disconnect();
 
   // Return the base64 audio string and word timings
-  return new Response(
-    JSON.stringify({
-      audio: base64Audio,
-      wordTimings: wordTimings,
-    }),
-    {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    },
-  );
+  return Response.json({
+    audio: base64Audio,
+    wordTimings: wordTimings,
+  });
 }

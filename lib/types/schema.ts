@@ -63,9 +63,10 @@ export type Database = {
           relevant_figures: string[] | null
           significant_political_events: string[] | null
           state: string
+          state_governor: string | null
           things_people_like: string[] | null
           topics: Database["public"]["Enums"]["topic_enum"][] | null
-          town: string
+          town: string | null
         }
         Insert: {
           average_income?: string | null
@@ -84,9 +85,10 @@ export type Database = {
           relevant_figures?: string[] | null
           significant_political_events?: string[] | null
           state: string
+          state_governor?: string | null
           things_people_like?: string[] | null
           topics?: Database["public"]["Enums"]["topic_enum"][] | null
-          town: string
+          town?: string | null
         }
         Update: {
           average_income?: string | null
@@ -105,9 +107,10 @@ export type Database = {
           relevant_figures?: string[] | null
           significant_political_events?: string[] | null
           state?: string
+          state_governor?: string | null
           things_people_like?: string[] | null
           topics?: Database["public"]["Enums"]["topic_enum"][] | null
-          town?: string
+          town?: string | null
         }
         Relationships: []
       }
