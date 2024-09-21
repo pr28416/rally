@@ -9,23 +9,38 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      campaign_firecrawl_descriptions: {
+        Row: {
+          markdown: string
+          url: string
+        }
+        Insert: {
+          markdown: string
+          url: string
+        }
+        Update: {
+          markdown?: string
+          url?: string
+        }
+        Relationships: []
+      }
       campaign_policies: {
         Row: {
-          campaign_policy: string
           campaign_subtopic: string
           campaign_topic: string
+          detailed_campaign_policy: string
           id: string
         }
         Insert: {
-          campaign_policy: string
           campaign_subtopic: string
           campaign_topic: string
+          detailed_campaign_policy: string
           id?: string
         }
         Update: {
-          campaign_policy?: string
           campaign_subtopic?: string
           campaign_topic?: string
+          detailed_campaign_policy?: string
           id?: string
         }
         Relationships: []
