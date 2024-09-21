@@ -37,10 +37,10 @@ interface Video {
 
 export async function POST(request: Request) {
   try {
-    const { query, duration } = await request.json();
+    const { query } = await request.json();
 
-    if (!query || typeof query !== 'string' || !duration || typeof duration !== 'number') {
-      return NextResponse.json({ error: 'Invalid query or duration' }, { status: 400 });
+    if (!query || typeof query !== 'string') {
+      return NextResponse.json({ error: 'Invalid query' }, { status: 400 });
     }
 
     const url = new URL(PEXELS_API_URL);
@@ -64,24 +64,14 @@ export async function POST(request: Request) {
     }
 
     const data = await response.json();
+    const videos = data.videos as VideoFile[];
 
-    const selectedVideo = data.videos.reverse().find((video: Video) => {
-      const videoDuration = video.duration;
-      return Math.abs(videoDuration - duration) <= 3;
-    });
-
-    if (!selectedVideo) {
-      return NextResponse.json({ error: 'No suitable video found' }, { status: 404 });
+    if (!videos || videos.length === 0) {
+      return NextResponse.json({ error: 'No videos found' }, { status: 404 });
     }
 
-    const hdFile = selectedVideo.video_files.find((file: VideoFile) => file.quality === 'hd');
-    const videoUrl = hdFile ? hdFile.link : null;
+    return NextResponse.json({ videos });
 
-    if (!videoUrl) {
-      return NextResponse.json({ error: 'No HD video file found' }, { status: 404 });
-    }
-
-    return NextResponse.json({ videoUrl });
   } catch (error) {
     console.error('Error searching videos:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
