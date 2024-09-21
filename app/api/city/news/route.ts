@@ -163,7 +163,7 @@ export async function POST(request: Request) {
         town,
         state,
         ...openaiData
-    }, { onConflict: 'town,state' });
+    });
 
     if (upsertError) {
       throw new Error(`Error upserting data into Supabase: ${upsertError.message}`);
