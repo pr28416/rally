@@ -12,6 +12,8 @@ import os from "os";
 import { promises as fs } from "fs";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
+import { generateVideo } from "../../video/generate/services";
+import { GenerateVideoResponse } from "../../video/generate/types";
 
 const execPromise = util.promisify(exec);
 
@@ -67,24 +69,43 @@ export async function generateAd(voter: VoterRecord) {
             finalTimestamps,
         );
 
-    // console.log(
-    //     "audioClipPublicUrls",
-    //     audioClipPublicUrls,
-    //     "\nfinalTimestamps",
-    //     finalTimestamps,
-    //     "\nadjustedTimestamps",
-    //     adjustedTimestamps,
-    //     "\nsegmentTimestamps",
-    //     segmentTimestamps,
-    //     "\nfilteredBRollSegments",
-    //     filteredBRollSegments,
-    //     "\nscript_segments",
-    //     script_segments,
-    // );
+    // Choose random face clips for each non b-roll segment
+    const faceClipPublicUrls = await choose_and_upload_face_clips(
+        finalTimestamps,
+        await getAiMaskUrl(),
+    );
 
-    // TODO: Change this. Right now it's just for testing
-    // Return an object with all generated data for further processing or testing
+    // Generate videos from clips and audio
+    const videoPublicUrlPromises: Promise<GenerateVideoResponse>[] = [];
+    for (let i = 0; i < finalTimestamps.length; i++) {
+        const timestamp = finalTimestamps[i];
+        if (timestamp.is_b_roll && timestamp.b_roll_link) {
+            videoPublicUrlPromises.push(Promise.resolve({
+                resultUrl: timestamp.b_roll_link,
+                elapsedTime: 0,
+            }));
+        } else if (faceClipPublicUrls[i] && audioClipPublicUrls[i]) {
+            videoPublicUrlPromises.push(generateVideo({
+                videoUrl: faceClipPublicUrls[i]!,
+                audioUrl: audioClipPublicUrls[i]!,
+            }));
+        }
+    }
+
+    // Execute 5 promises in parallel (SyncLabs limit)
+    const videoPublicUrls: string[] =
+        (await PromiseAllBatch(videoPublicUrlPromises, 5)).map((v) =>
+            v.resultUrl
+        );
+
+    // Stitch videos
+    const stitchedVideoPublicUrl = await stitch_clips(
+        videoPublicUrls,
+        wavFile,
+    );
+
     return {
+        stitchedVideoPublicUrl: stitchedVideoPublicUrl,
         audioClipPublicUrls: audioClipPublicUrls,
         originalTimestamps: segmentTimestamps,
         adjustedTimestamps: adjustedTimestamps,
@@ -92,6 +113,25 @@ export async function generateAd(voter: VoterRecord) {
         script_segments: script_segments,
         bRollSegments: filteredBRollSegments,
     };
+}
+
+async function getAiMaskUrl() {
+    const { data: { publicUrl: ai_mask_url } } = await supabase.storage
+        .from("kamala-clips")
+        .getPublicUrl("kamala_clip_1.mp4");
+    return ai_mask_url;
+}
+
+async function PromiseAllBatch<T>(
+    promises: Promise<T>[],
+    n_proc: number,
+): Promise<T[]> {
+    const batches = Array.from(
+        { length: Math.ceil(promises.length / n_proc) },
+        (_, i) => promises.slice(i * n_proc, (i + 1) * n_proc),
+    );
+    const batchPromises = batches.map((batch) => Promise.all(batch));
+    return (await Promise.all(batchPromises)).flat();
 }
 
 async function getScriptSegments(voter: VoterRecord) {
@@ -424,12 +464,14 @@ async function choose_and_upload_face_clips(
     videoFile: string,
 ): Promise<string[]> {
     // Download video file to local tmp directory
-    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'video-processing-'));
-    const localVideoPath = path.join(tempDir, 'input_video.mp4');
-    
+    const tempDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), "video-processing-"),
+    );
+    const localVideoPath = path.join(tempDir, "input_video.mp4");
+
     try {
         const { data, error } = await supabase.storage
-            .from('kamala-clips')
+            .from("kamala-clips")
             .download(videoFile);
 
         if (error) {
@@ -443,13 +485,14 @@ async function choose_and_upload_face_clips(
         // Update videoFile variable to use the local path
         videoFile = localVideoPath;
     } catch (error) {
-        console.error('Error in downloading video file:', error);
+        console.error("Error in downloading video file:", error);
         throw error;
     }
-    
+
     return Promise.all(timestamps.map(async (timestamp) => {
         const { start, end } = timestamp;
         const videoFileClip = `${videoFile}_clip_${start}_${end}.mp4`;
+
         // Get video duration
         const durationCommand =
             `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoFile}"`;
@@ -505,7 +548,7 @@ async function choose_and_upload_face_clips(
 
 async function stitch_clips(
     clipUrls: string[],
-    audioFile: string,
+    audioFilePath: string,
 ): Promise<string> {
     const tempDir = await fs.mkdtemp(
         path.join(os.tmpdir(), "video-stitching-"),
@@ -534,17 +577,45 @@ async function stitch_clips(
 
         // Stitch videos and add audio
         const ffmpegCommand =
-            `ffmpeg -f concat -safe 0 -i "${concatFile}" -i "${audioFile}" -c:v libx264 -c:a aac -map 0:v -map 1:a -shortest -af "aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=mono" "${outputFile}"`;
+            `ffmpeg -f concat -safe 0 -i "${concatFile}" -i "${audioFilePath}" -c:v libx264 -c:a aac -map 0:v -map 1:a -shortest -af "aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=mono" "${outputFile}"`;
         await execPromise(ffmpegCommand);
 
-        // Return the path to the output file
-        return outputFile;
+        // Upload the stitched video to Supabase
+        const fileBuffer = await fs.readFile(outputFile);
+        const { error } = await supabase.storage
+            .from("kamala-segments")
+            .upload(`stitched_${uuidv4()}.mp4`, fileBuffer, {
+                contentType: "video/mp4",
+            });
+
+        if (error) {
+            console.error(
+                `Error uploading stitched video to Supabase: ${error.message}`,
+            );
+            throw error;
+        }
+
+        // Get the public URL of the uploaded stitched video
+        const { data: { publicUrl } } = supabase.storage
+            .from("kamala-segments")
+            .getPublicUrl(`stitched_${uuidv4()}.mp4`);
+
+        if (!publicUrl) {
+            console.error(`Error getting public URL for stitched video`);
+            throw new Error("Error getting public URL");
+        }
+
+        return publicUrl;
     } catch (error) {
         console.error("Error in stitch_clips:", error);
         throw error;
     } finally {
-        // Clean up temporary files (except the output file)
-        const filesToDelete = [audioFile, concatFile, ...videoFiles];
+        // Clean up temporary files
+        const filesToDelete = [
+            concatFile,
+            outputFile,
+            ...videoFiles,
+        ];
         await Promise.all(
             filesToDelete.map((file) => fs.unlink(file).catch(() => {})),
         );

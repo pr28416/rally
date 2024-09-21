@@ -4,3 +4,11 @@ export type GenerateVideoRequest = {
     synergize?: boolean;
     model?: string;
 };
+
+export interface GenerateVideoResponse {
+    jobId?: string;
+    status?: string;
+    resultUrl: string;
+    elapsedTime: number;
+    error?: string;
+}

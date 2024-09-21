@@ -1,13 +1,15 @@
-import { GenerateVideoRequest } from "./types";
+import { GenerateVideoRequest, GenerateVideoResponse } from "./types";
 
 async function generateVideo(
     request: GenerateVideoRequest,
     timeout: number = 5 * 60 * 1000, // Default timeout of 5 minutes
-) {
+): Promise<GenerateVideoResponse> {
     return new Promise(async (resolve, reject) => {
         const timeoutId = setTimeout(() => {
             reject(new Error("Video generation timed out"));
         }, timeout);
+
+        const startTime = Date.now();
 
         try {
             console.log("Generating video for: ", request);
@@ -44,7 +46,6 @@ async function generateVideo(
 
             let status = jobStatus;
             let resultUrl = "";
-            const startTime = Date.now();
 
             while (status === "PENDING" || status === "PROCESSING") {
                 if (Date.now() - startTime > timeout) {
@@ -69,7 +70,12 @@ async function generateVideo(
                         resultUrl = statusData.videoUrl;
                         clearTimeout(timeoutId);
                         const elapsedTime = Date.now() - startTime;
-                        resolve({ job_id, status, resultUrl, elapsedTime });
+                        resolve({
+                            jobId: job_id,
+                            status,
+                            resultUrl,
+                            elapsedTime,
+                        });
                         return;
                     } else {
                         throw new Error("No result URL found");
@@ -78,10 +84,10 @@ async function generateVideo(
                     clearTimeout(timeoutId);
                     const elapsedTime = Date.now() - startTime;
                     reject({
-                        job_id,
+                        jobId: job_id,
                         status,
                         resultUrl,
-                        statusData,
+                        error: statusData.error || "Unknown error",
                         elapsedTime,
                     });
                     return;
@@ -90,11 +96,22 @@ async function generateVideo(
 
             clearTimeout(timeoutId);
             const elapsedTime = Date.now() - startTime;
-            resolve({ job_id, status, resultUrl, elapsedTime });
+            resolve({
+                jobId: job_id,
+                status,
+                resultUrl,
+                elapsedTime,
+            });
         } catch (error) {
             console.error(error);
             clearTimeout(timeoutId);
-            reject(error);
+            reject({
+                jobId: null,
+                status: "ERROR",
+                resultUrl: "",
+                error: error instanceof Error ? error.message : "Unknown error",
+                elapsedTime: Date.now() - startTime,
+            });
         }
     });
 }
