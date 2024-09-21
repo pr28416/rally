@@ -64,6 +64,7 @@ export type Database = {
           significant_political_events: string[] | null
           state: string
           things_people_like: string[] | null
+          topics: Database["public"]["Enums"]["topic_enum"][] | null
           town: string
         }
         Insert: {
@@ -84,6 +85,7 @@ export type Database = {
           significant_political_events?: string[] | null
           state: string
           things_people_like?: string[] | null
+          topics?: Database["public"]["Enums"]["topic_enum"][] | null
           town: string
         }
         Update: {
@@ -104,6 +106,7 @@ export type Database = {
           significant_political_events?: string[] | null
           state?: string
           things_people_like?: string[] | null
+          topics?: Database["public"]["Enums"]["topic_enum"][] | null
           town?: string
         }
         Relationships: []
