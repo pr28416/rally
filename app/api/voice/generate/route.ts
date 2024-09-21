@@ -4,7 +4,7 @@ export async function POST(req: Request) {
   const { transcript } = await req.json();
 
   const cartesia = new Cartesia({
-    apiKey: process.env.CARTEISIA_API_KEY,
+    apiKey: process.env.CARTESIA_API_KEY,
   });
 
   const websocket = await cartesia.tts.websocket({
