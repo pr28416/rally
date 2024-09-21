@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { OpenAI } from 'openai';
 import { supabase } from '@/lib/supabase/client';
+import { z } from 'zod';
+import { zodResponseFormat } from "openai/helpers/zod.mjs";
 
 const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -15,6 +17,46 @@ if (!OPENAI_API_KEY) {
 
 const openai = new OpenAI({
   apiKey: OPENAI_API_KEY,
+});
+
+const CitySchema = z.object({
+  mayor: z.string(),
+  county_name: z.string(),
+  local_government_actions: z.array(z.string()),
+  significant_political_events: z.array(z.string()),
+  average_income: z.string(),
+  economic_growth: z.string(),
+  birth_rates: z.string(),
+  party_leanings: z.string(),
+  general_vote_history: z.string(),
+  key_issues: z.array(z.string()),
+  causing_issues: z.array(z.string()),
+  things_people_like: z.array(z.string()),
+  relevant_figures: z.array(z.string()),
+  relevant_companies: z.array(z.string()), 
+  topic: z.enum([
+    "Immigration",
+    "Gun Rights",
+    "Healthcare",
+    "Climate Change",
+    "Economy",
+    "Education",
+    "National Security",
+    "Tax Policy",
+    "Social Security",
+    "Abortion",
+    "Civil Rights",
+    "Criminal Justice Reform",
+    "Foreign Policy",
+    "Voting Rights",
+    "Labor Rights",
+    "LGBTQ+ Rights",
+    "Drug Policy",
+    "Infrastructure",
+    "Trade Policy",
+    "Government Spending",
+    "Other",
+])
 });
 
 export async function POST(request: Request) {
@@ -37,22 +79,7 @@ export async function POST(request: Request) {
     }
 
     if (existingData) {
-      const formattedData = {
-        mayor: existingData.mayor,
-        county_name: existingData.county_name,
-        local_government_actions: existingData.local_government_actions,
-        significant_political_events: existingData.significant_political_events,
-        average_income: existingData.average_income,
-        economic_growth: existingData.economic_growth,
-        birth_rates: existingData.birth_rates,
-        party_leanings: existingData.party_leanings,
-        general_vote_history: existingData.general_vote_history,
-        key_issues: existingData.key_issues,
-        causing_issues: existingData.causing_issues,
-        things_people_like: existingData.things_people_like,
-        relevant_figures: existingData.relevant_figures,
-        relevant_companies: existingData.relevant_companies
-      };
+      const formattedData = CitySchema.parse(existingData);
       return NextResponse.json(formattedData, { status: 200 });
     }
 
@@ -119,43 +146,19 @@ export async function POST(request: Request) {
             "causing_issues": ["string"],
             "things_people_like": ["string"],
             "relevant_figures": ["string"],
-            "relevant_companies": ["string"]
+            "relevant_companies": ["string"], 
+            "topic": "Immigration" | "Gun Rights" | "Healthcare" | "Climate Change" | "Economy" | "Education" | "National Security" | "Tax Policy" | "Social Security" | "Abortion" | "Civil Rights" | "Criminal Justice Reform" | "Foreign Policy" | "Voting Rights" | "Labor Rights" | "LGBTQ+ Rights" | "Drug Policy" | "Infrastructure" | "Trade Policy" | "Government Spending" | "Other"
           }`
         }
       ],
-      functions: [
-        {
-          name: "structured_output",
-          description: "Return the output in a structured JSON format",
-          parameters: {
-            type: "object",
-            properties: {
-              mayor: { type: "string" },
-              county_name: { type: "string" },
-              local_government_actions: { type: "array", items: { type: "string" } },
-              significant_political_events: { type: "array", items: { type: "string" } },
-              average_income: { type: "string" },
-              economic_growth: { type: "string" },
-              birth_rates: { type: "string" },
-              party_leanings: { type: "string" },
-              general_vote_history: { type: "string" },
-              key_issues: { type: "array", items: { type: "string" } },
-              causing_issues: { type: "array", items: { type: "string" } },
-              things_people_like: { type: "array", items: { type: "string" } },
-              relevant_figures: { type: "array", items: { type: "string" } },
-              relevant_companies: { type: "array", items: { type: "string" } }
-            },
-            required: ["mayor", "local_government_actions", "significant_political_events", "average_income", "economic_growth", "birth_rates", "party_leanings", "general_vote_history", "county_name", "key_issues", "causing_issues", "things_people_like", "relevant_figures", "relevant_companies"]
-          }
-        }
-      ]
+      response_format: zodResponseFormat(CitySchema, 'City')
     });
 
     if (!openaiResponse.choices[0].message) {
       throw new Error('OpenAI API did not return a valid response');
     }
 
-    const openaiData = JSON.parse(openaiResponse.choices[0].message.function_call?.arguments || '{}');
+    const openaiData = openaiResponse.choices[0].message.parsed;
 
     const { error: upsertError } = await supabase
       .from('cities')
