@@ -13,6 +13,7 @@ const generateScript = async (voter: VoterRecord) => {
         .select("*")
         .eq("town", voter.city)
         .eq("state", voter.state)
+        .order("created_at", { ascending: false })
         .returns<CityData>()
         .maybeSingle();
 
@@ -23,4 +24,6 @@ const generateScript = async (voter: VoterRecord) => {
     if (!cityData) {
         throw new Error("City data not found");
     }
+
+    // Get all the campaign issues that fall in the voter's topic list
 };
