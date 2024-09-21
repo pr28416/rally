@@ -30,6 +30,69 @@ export type Database = {
         }
         Relationships: []
       }
+      cities: {
+        Row: {
+          average_income: string | null
+          birth_rates: string | null
+          causing_issues: string[] | null
+          county_name: string | null
+          created_at: string | null
+          economic_growth: string | null
+          general_vote_history: string | null
+          id: string
+          key_issues: string[] | null
+          local_government_actions: string[] | null
+          mayor: string | null
+          party_leanings: string | null
+          relevant_companies: string[] | null
+          relevant_figures: string[] | null
+          significant_political_events: string[] | null
+          state: string
+          things_people_like: string[] | null
+          town: string
+        }
+        Insert: {
+          average_income?: string | null
+          birth_rates?: string | null
+          causing_issues?: string[] | null
+          county_name?: string | null
+          created_at?: string | null
+          economic_growth?: string | null
+          general_vote_history?: string | null
+          id?: string
+          key_issues?: string[] | null
+          local_government_actions?: string[] | null
+          mayor?: string | null
+          party_leanings?: string | null
+          relevant_companies?: string[] | null
+          relevant_figures?: string[] | null
+          significant_political_events?: string[] | null
+          state: string
+          things_people_like?: string[] | null
+          town: string
+        }
+        Update: {
+          average_income?: string | null
+          birth_rates?: string | null
+          causing_issues?: string[] | null
+          county_name?: string | null
+          created_at?: string | null
+          economic_growth?: string | null
+          general_vote_history?: string | null
+          id?: string
+          key_issues?: string[] | null
+          local_government_actions?: string[] | null
+          mayor?: string | null
+          party_leanings?: string | null
+          relevant_companies?: string[] | null
+          relevant_figures?: string[] | null
+          significant_political_events?: string[] | null
+          state?: string
+          things_people_like?: string[] | null
+          town?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
