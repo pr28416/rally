@@ -34,7 +34,7 @@ const CitySchema = z.object({
   things_people_like: z.array(z.string()),
   relevant_figures: z.array(z.string()),
   relevant_companies: z.array(z.string()), 
-  topic: z.enum([
+  topics: z.array(z.enum([
     "Immigration",
     "Gun Rights",
     "Healthcare",
@@ -56,7 +56,7 @@ const CitySchema = z.object({
     "Trade Policy",
     "Government Spending",
     "Other",
-])
+  ]))
 });
 
 export async function POST(request: Request) {
@@ -131,6 +131,7 @@ export async function POST(request: Request) {
           - Things people like: List and describe things that people in the town appreciate.
           - Relevant figures: Identify and provide details about important figures in the town.
           - Relevant companies: Identify and provide details about significant companies in the town.
+          - Topics: Identify and provide details about important topics in the town. Generate a maximum of 5 topics. 
           Format the response in a structured JSON format with the following fields:
           {
             "mayor": "string",
@@ -147,7 +148,7 @@ export async function POST(request: Request) {
             "things_people_like": ["string"],
             "relevant_figures": ["string"],
             "relevant_companies": ["string"], 
-            "topic": "Immigration" | "Gun Rights" | "Healthcare" | "Climate Change" | "Economy" | "Education" | "National Security" | "Tax Policy" | "Social Security" | "Abortion" | "Civil Rights" | "Criminal Justice Reform" | "Foreign Policy" | "Voting Rights" | "Labor Rights" | "LGBTQ+ Rights" | "Drug Policy" | "Infrastructure" | "Trade Policy" | "Government Spending" | "Other"
+            "topic":[ "Immigration" | "Gun Rights" | "Healthcare" | "Climate Change" | "Economy" | "Education" | "National Security" | "Tax Policy" | "Social Security" | "Abortion" | "Civil Rights" | "Criminal Justice Reform" | "Foreign Policy" | "Voting Rights" | "Labor Rights" | "LGBTQ+ Rights" | "Drug Policy" | "Infrastructure" | "Trade Policy" | "Government Spending" | "Other" ]
           }`
         }
       ],
@@ -160,6 +161,9 @@ export async function POST(request: Request) {
 
     const openaiData = openaiResponse.choices[0].message.parsed;
 
+    if (openaiData?.topics) {
+        openaiData.topics = openaiData.topics.slice(0, 5);
+    }
     const { error: upsertError } = await supabase
       .from('cities')
       .upsert({
