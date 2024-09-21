@@ -4,12 +4,13 @@ import { PostgrestError } from "@supabase/supabase-js";
 import { z } from "zod";
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod.mjs";
+import { getQueryLocation } from "@/lib/cityUtils";
 
 type VoterRecord = Database["public"]["Tables"]["voter_records"]["Row"];
 type CityData = Database["public"]["Tables"]["cities"]["Row"];
 type CampaignPolicy = Database["public"]["Tables"]["campaign_policies"]["Row"];
 
-export const AdSegmentSchema = z.object({
+const AdSegmentSchema = z.object({
     spoken_transcript: z.string(),
     is_b_roll: z.boolean(),
     b_roll_search_query: z.string().optional(),
@@ -22,21 +23,28 @@ const AdSegmentArraySchema = z.object({
 const generateScript = async (
     voter: VoterRecord,
 ): Promise<z.infer<typeof AdSegmentArraySchema>> => {
-    // Find city data for the city the voter lives in
     if (!voter.city || !voter.state) {
         throw new Error("Voter city or state is null");
     }
+
+    const { queryType } = getQueryLocation(voter.city, voter.state);
+
+    let query = supabase
+        .from("cities")
+        .select("*")
+        .eq("state", voter.state)
+        .order("created_at", { ascending: false });
+
+    if (queryType === 'town') {
+        query = query.eq("town", voter.city);
+    } else {
+        query = query.is("town", null).is("county_name", null);
+    }
+
     const { data: cityData, error: cityError }: {
         data: CityData | null;
         error: PostgrestError | null;
-    } = await supabase
-        .from("cities")
-        .select("*")
-        .eq("town", voter.city)
-        .eq("state", voter.state)
-        .order("created_at", { ascending: false })
-        .returns<CityData>()
-        .maybeSingle();
+    } = await query.returns<CityData>().maybeSingle();
 
     if (cityError) {
         throw new Error("Error getting city data");
@@ -103,8 +111,7 @@ const generateScript = async (
         Guidelines:
         - Maintain a balance between candidate shots and B-roll
         - Whether or not a clip is B-roll, Kamala Harris will be speaking, so spoken_transcript should be what she says.
-        - Keep the overall length to 45 seconds or less
-        - For B-roll segments, provide the b_roll_search_query as a list of 3-5 keywords, separated by commas`;
+        - Keep the overall length to 45 seconds or less`;
 
     const overallScriptUserPrompt = [
         `Voter background: ${
