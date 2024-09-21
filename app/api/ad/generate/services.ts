@@ -17,6 +17,48 @@ import { GenerateVideoResponse } from "../../video/generate/types";
 
 const execPromise = util.promisify(exec);
 
+// Add this new function
+async function safeExecPromise(command: string): Promise<string> {
+    const maxRetries = 3;
+    let retries = 0;
+
+    while (retries < maxRetries) {
+        try {
+            const { stdout, stderr } = await execPromise(command);
+            if (stderr) {
+                console.warn(`FFmpeg command produced stderr: ${stderr}`);
+            }
+            return stdout;
+        } catch (error) {
+            console.error(
+                `Error executing FFmpeg command (attempt ${
+                    retries + 1
+                }/${maxRetries}): ${command}`,
+            );
+            console.error(`Error details:`, error);
+            retries++;
+
+            if (retries === maxRetries) {
+                if (error instanceof Error) {
+                    throw new Error(
+                        `FFmpeg command failed after ${maxRetries} attempts: ${error.message}`,
+                    );
+                } else {
+                    throw new Error(
+                        `FFmpeg command failed after ${maxRetries} attempts: Unknown error`,
+                    );
+                }
+            }
+
+            // Wait for a short time before retrying
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+    }
+
+    // This line should never be reached, but TypeScript requires it
+    throw new Error("Unexpected error in safeExecPromise");
+}
+
 type VoterRecord = Database["public"]["Tables"]["voter_records"]["Row"];
 type AdjustedTimestamp = {
     start: number;
@@ -72,7 +114,7 @@ export async function generateAd(voter: VoterRecord) {
     // Choose random face clips for each non b-roll segment
     const faceClipPublicUrls = await choose_and_upload_face_clips(
         finalTimestamps,
-        await getAiMaskUrl(),
+        "kamala_clip_1.mp4",
     );
 
     // Generate videos from clips and audio
@@ -113,13 +155,6 @@ export async function generateAd(voter: VoterRecord) {
         script_segments: script_segments,
         bRollSegments: filteredBRollSegments,
     };
-}
-
-async function getAiMaskUrl() {
-    const { data: { publicUrl: ai_mask_url } } = await supabase.storage
-        .from("kamala-clips")
-        .getPublicUrl("kamala_clip_1.mp4");
-    return ai_mask_url;
 }
 
 async function PromiseAllBatch<T>(
@@ -227,7 +262,7 @@ async function convertAndSaveTempAudio(
     const ffmpegCommand =
         `ffmpeg -f f32le -i "${localPcmPath}" "${localWAVPath}"`;
     console.log("ffmpegCommand", ffmpegCommand);
-    await execPromise(ffmpegCommand);
+    await safeExecPromise(ffmpegCommand);
 
     const wavFileStats = await fs.stat(localWAVPath);
     console.log("WAV file size:", wavFileStats.size);
@@ -257,7 +292,12 @@ function constructSegmentTimestamps(
 
     for (const [word, start, end] of wordTimings) {
         if (segmentIndex === script_segments.length) {
-            throw new Error("Generated audio is longer than the script");
+            throw new Error(
+                `Generated audio is longer than the script: ${
+                    script_segments.map((segment) => segment.spoken_transcript)
+                        .join(" ")
+                }`,
+            );
         }
 
         if (wordIndex === 0) {
@@ -428,7 +468,7 @@ async function trim_audio_to_segments_upload_and_choose_clip(
             `ffmpeg -i "${wavFile}" -ss ${start} -to ${end} -c copy "${fileName}"`;
 
         console.log("ffmpegCommand", ffmpegCommand);
-        await execPromise(ffmpegCommand);
+        await safeExecPromise(ffmpegCommand);
 
         const fileBuffer = await fs.readFile(fileName);
         const { error } = await supabase.storage
@@ -462,8 +502,7 @@ async function trim_audio_to_segments_upload_and_choose_clip(
 async function choose_and_upload_face_clips(
     timestamps: AdjustedTimestamp[],
     videoFile: string,
-): Promise<string[]> {
-    // Download video file to local tmp directory
+): Promise<(string | null)[]> {
     const tempDir = await fs.mkdtemp(
         path.join(os.tmpdir(), "video-processing-"),
     );
@@ -471,79 +510,78 @@ async function choose_and_upload_face_clips(
 
     try {
         const { data, error } = await supabase.storage
-            .from("kamala-clips")
+            .from("video-files")
             .download(videoFile);
 
         if (error) {
             throw new Error(`Error downloading video file: ${error.message}`);
         }
 
-        const arrayBuffer = await data.arrayBuffer();
-        await fs.writeFile(localVideoPath, Buffer.from(arrayBuffer));
+        await fs.writeFile(
+            localVideoPath,
+            Buffer.from(await data.arrayBuffer()),
+        );
         console.log(`Video file downloaded to: ${localVideoPath}`);
 
-        // Update videoFile variable to use the local path
-        videoFile = localVideoPath;
-    } catch (error) {
-        console.error("Error in downloading video file:", error);
-        throw error;
-    }
-
-    return Promise.all(timestamps.map(async (timestamp) => {
-        const { start, end } = timestamp;
-        const videoFileClip = `${videoFile}_clip_${start}_${end}.mp4`;
-
-        // Get video duration
         const durationCommand =
-            `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoFile}"`;
-        const durationOutput = await execPromise(durationCommand);
-        const videoDuration = parseFloat(durationOutput.stdout.trim());
+            `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${localVideoPath}"`;
+        const durationOutput = await safeExecPromise(durationCommand);
+        const videoDuration = parseFloat(durationOutput.trim());
+        console.log(`Video duration: ${videoDuration}`);
 
-        const clipDuration = end - start;
+        return Promise.all(timestamps.map(async (timestamp) => {
+            if (timestamp.is_b_roll) {
+                return null; // Skip b-roll segments
+            }
 
-        if (clipDuration > videoDuration) {
-            throw new Error(
-                `Clip duration (${clipDuration}s) is longer than video duration (${videoDuration}s)`,
-            );
-        }
+            const { start, end } = timestamp;
+            const clipDuration = end - start;
 
-        // Choose a random start time for the clip
-        const maxStartTime = videoDuration - clipDuration;
-        const randomStartTime = Math.random() * maxStartTime;
+            if (clipDuration > videoDuration) {
+                console.error(
+                    `Clip duration (${clipDuration}s) is longer than video duration (${videoDuration}s)`,
+                );
+                return null;
+            }
 
-        // Extract the clip
-        const ffmpegCommand =
-            `ffmpeg -ss ${randomStartTime} -i "${videoFile}" -t ${clipDuration} -c copy "${videoFileClip}"`;
-        await execPromise(ffmpegCommand);
+            const maxStartTime = videoDuration - clipDuration;
+            const randomStartTime = Math.random() * maxStartTime;
+            const uniqueId = uuidv4();
+            const videoFileClip = path.join(tempDir, `clip_${uniqueId}.mp4`);
 
-        // Upload the clip to Supabase
-        const fileBuffer = await fs.readFile(videoFileClip);
-        const { error } = await supabase.storage
-            .from("kamala-clips/kamala-segments")
-            .upload(videoFileClip, fileBuffer, {
-                contentType: "video/mp4",
-            });
+            const ffmpegCommand =
+                `ffmpeg -ss ${randomStartTime} -i "${localVideoPath}" -t ${clipDuration} -c copy "${videoFileClip}"`;
+            await safeExecPromise(ffmpegCommand);
 
-        if (error) {
-            console.error(`Error uploading clip to Supabase: ${error.message}`);
-            throw error;
-        }
+            const fileBuffer = await fs.readFile(videoFileClip);
+            const { error: uploadError } = await supabase.storage
+                .from("video-files/kamala-segments")
+                .upload(`clip_${uniqueId}.mp4`, fileBuffer, {
+                    contentType: "video/mp4",
+                });
 
-        // Get the public URL of the uploaded clip
-        const { data: { publicUrl } } = supabase.storage
-            .from("kamala-clips/kamala-segments")
-            .getPublicUrl(videoFileClip);
+            if (uploadError) {
+                console.error(
+                    `Error uploading clip to Supabase: ${uploadError.message}`,
+                );
+                return null;
+            }
 
-        if (!publicUrl) {
-            console.error(`Error getting public URL for clip`);
-            throw new Error("Error getting public URL");
-        }
+            const { data: { publicUrl } } = supabase.storage
+                .from("video-files/kamala-segments")
+                .getPublicUrl(`clip_${uniqueId}.mp4`);
 
-        // Clean up the local clip file
-        await fs.unlink(videoFileClip);
+            await fs.unlink(videoFileClip);
 
-        return publicUrl;
-    }));
+            return publicUrl || null;
+        }));
+    } catch (error) {
+        console.error("Error in choose_and_upload_face_clips:", error);
+        return timestamps.map(() => null);
+    } finally {
+        // Clean up temporary directory and files
+        await fs.rm(tempDir, { recursive: true, force: true });
+    }
 }
 
 async function stitch_clips(
@@ -578,7 +616,7 @@ async function stitch_clips(
         // Stitch videos and add audio
         const ffmpegCommand =
             `ffmpeg -f concat -safe 0 -i "${concatFile}" -i "${audioFilePath}" -c:v libx264 -c:a aac -map 0:v -map 1:a -shortest -af "aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=mono" "${outputFile}"`;
-        await execPromise(ffmpegCommand);
+        await safeExecPromise(ffmpegCommand);
 
         // Upload the stitched video to Supabase
         const fileBuffer = await fs.readFile(outputFile);
