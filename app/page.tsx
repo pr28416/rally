@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 
 export default function Home() {
   const handleTriggerRoute = async () => {
-    const response = await fetch("/script/generate/api", {
+    const response = await fetch("/api/script/generate", {
       method: "POST",
       body: JSON.stringify({ prompt: "Hello World" }),
     });
