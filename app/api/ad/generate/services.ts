@@ -142,41 +142,46 @@ export async function generateAd(voter: VoterRecord) {
         b_roll_promise(),
     ]);
 
-    const convert_save_temp_audio_promise: Promise<{ wavFile: string }> =
-        async () => {
-            // Decode base64 audio string
-            const audioBuffer = Buffer.from(audio_response.audio, "base64");
+    const convert_save_temp_audio_promise = async (): Promise<
+        { wavFile: string }
+    > => {
+        // Decode base64 audio string
+        const audioBuffer = Buffer.from(audio_response.audio, "base64");
 
-            // Generate a unique filename
-            const filename = `audio_${Date.now()}`;
-            console.log("filename", filename);
+        // Generate a unique filename
+        const filename = `audio_${Date.now()}`;
+        console.log("filename", filename);
 
-            const tempDir = await fs.mkdtemp(
-                path.join(os.tmpdir(), "video-processing-"),
-            );
-            console.log("tempDir", tempDir);
+        const tempDir = await fs.mkdtemp(
+            path.join(os.tmpdir(), "video-processing-"),
+        );
+        console.log("tempDir", tempDir);
 
-            // Save the PCM file locally
-            const localPcmPath = path.join(tempDir, `${filename}.pcm`);
-            console.log("localPcmPath", localPcmPath);
-            await fs.writeFile(localPcmPath, audioBuffer);
+        // Save the PCM file locally
+        const localPcmPath = path.join(tempDir, `${filename}.pcm`);
+        console.log("localPcmPath", localPcmPath);
+        await fs.writeFile(localPcmPath, audioBuffer);
 
-            // Run ffmpeg command to convert PCM to WAV
-            const localWAvPath = path.join(tempDir, `${filename}.wav`);
-            console.log("localWAvPath", localWAvPath);
-            const ffmpegCommand =
-                `ffmpeg -f f32le -i "${localPcmPath}" "${localWAvPath}"`;
-            console.log("ffmpegCommand", ffmpegCommand);
-            await execPromise(ffmpegCommand);
+        // Run ffmpeg command to convert PCM to WAV
+        const localWAVPath = path.join(tempDir, `${filename}.wav`);
+        console.log("localWAVPath", localWAVPath);
+        const ffmpegCommand =
+            `ffmpeg -f f32le -i "${localPcmPath}" "${localWAVPath}"`;
+        console.log("ffmpegCommand", ffmpegCommand);
+        await execPromise(ffmpegCommand);
 
-            const wavFileStats = await fs.stat(localWAvPath);
-            console.log("WAV file size:", wavFileStats.size);
+        const wavFileStats = await fs.stat(localWAVPath);
+        console.log("WAV file size:", wavFileStats.size);
 
-            // Return the filenames for further use if needed
-            return {
-                wavFile: `${filename}.wav`,
-            };
+        // Return the filenames for further use if needed
+        return {
+            wavFile: `${filename}.wav`,
         };
+    };
+
+    // Start the audio conversion process in the background so it's ready later
+    const wavFilePromise: Promise<{ wavFile: string }> =
+        convert_save_temp_audio_promise();
 
     // Construct timestamp'd script_segments
     const segmentTimestamps: [number, number][] = [];
@@ -330,8 +335,18 @@ export async function generateAd(voter: VoterRecord) {
         }
     }
 
+    const { wavFile } = await wavFilePromise;
+
+    // Trim audio to segments and upload to Supabase. Each element will be a public URL to the audio clip if the clip is not a B-roll, otherwise it's null. Thus, this will be an array of length finalTimestamps.length.
+    const audioClipPublicUrls: (string | null)[] =
+        await trim_audio_to_segments_upload_and_choose_clip(
+            wavFile,
+            finalTimestamps,
+        );
+
     // TODO: Change this. Right now it's just for testing
     return {
+        audioClipPublicUrls: audioClipPublicUrls,
         originalTimestamps: segmentTimestamps,
         adjustedTimestamps: adjustedTimestamps,
         finalTimestamps: finalTimestamps,
@@ -375,10 +390,14 @@ function calculateLipsyncIntervals(
 async function trim_audio_to_segments_upload_and_choose_clip(
     wavFile: string,
     timestamps: AdjustedTimestamp[],
-): Promise<string[]> {
+): Promise<(string | null)[]> {
     return Promise.all(
-        timestamps.filter((timestamp) => !timestamp.is_b_roll).map(
+        timestamps.map(
             async (timestamp) => {
+                // If B-roll, we're not running SyncLab on it, so we don't need an audio clip url.
+                if (timestamp.is_b_roll) {
+                    return null;
+                }
                 const { start, end } = timestamp;
                 const fileName = `${wavFile}_trimmed_${start}_${end}.wav`;
                 const ffmpegCommand =
@@ -386,7 +405,7 @@ async function trim_audio_to_segments_upload_and_choose_clip(
                 await execPromise(ffmpegCommand);
                 // Upload the trimmed audio file to Supabase
                 const fileBuffer = await fs.readFile(fileName);
-                const { data, error } = await supabase.storage
+                const { error } = await supabase.storage
                     .from("audio-files")
                     .upload(fileName, fileBuffer, {
                         contentType: "audio/wav",
@@ -400,16 +419,16 @@ async function trim_audio_to_segments_upload_and_choose_clip(
                 }
 
                 // Get the public URL of the uploaded file
-                const { data: { publicUrl }, error: urlError } = supabase
+                const { data: { publicUrl } } = supabase
                     .storage
                     .from("audio-files")
                     .getPublicUrl(fileName);
 
-                if (urlError) {
+                if (!publicUrl) {
                     console.error(
-                        `Error getting public URL: ${urlError.message}`,
+                        `Error getting public URL`,
                     );
-                    throw urlError;
+                    throw new Error("Error getting public URL");
                 }
 
                 // Clean up the local trimmed file
