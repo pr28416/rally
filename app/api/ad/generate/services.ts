@@ -1,6 +1,14 @@
 import { Database } from "@/lib/types/schema";
 import { generateScript } from "../../script/generate/services";
-import { Video, VideoFile } from "../../broll/route";
+import { Video } from "../../broll/route";
+import { supabase } from "@/lib/supabase/client";
+import { exec } from "child_process";
+import util from "util";
+import path from "path";
+import os from "os";
+import { promises as fs } from "fs";
+
+const execPromise = util.promisify(exec);
 
 type VoterRecord = Database["public"]["Tables"]["voter_records"]["Row"];
 type AdjustedTimestamp = {
@@ -79,6 +87,40 @@ export async function generateAd(voter: VoterRecord) {
         audio_promise(),
         b_roll_promise(),
     ]);
+
+    const convert_save_temp_audio_promise: Promise<{wavFile: string}> = async () => {
+        // Decode base64 audio string
+        const audioBuffer = Buffer.from(audio_response.audio, 'base64');
+
+        // Generate a unique filename
+        const filename = `audio_${Date.now()}`;
+        console.log("filename", filename);
+
+        const tempDir = await fs.mkdtemp(
+            path.join(os.tmpdir(), "video-processing-"),
+          );
+          console.log("tempDir", tempDir);
+
+        // Save the PCM file locally
+        const localPcmPath = path.join(tempDir, `${filename}.pcm`);
+        console.log("localPcmPath", localPcmPath);
+        await fs.writeFile(localPcmPath, audioBuffer);
+
+        // Run ffmpeg command to convert PCM to WAV
+        const localWAvPath = path.join(tempDir, `${filename}.wav`);
+        console.log("localWAvPath", localWAvPath);
+        const ffmpegCommand = `ffmpeg -f f32le -i "${localPcmPath}" "${localWAvPath}"`;
+        console.log("ffmpegCommand", ffmpegCommand);
+        await execPromise(ffmpegCommand);
+
+        const wavFileStats = await fs.stat(localWAvPath);
+        console.log("WAV file size:", wavFileStats.size);
+
+        // Return the filenames for further use if needed
+        return {
+            wavFile: `${filename}.wav`,
+        };
+    }
 
     // Construct timestamp'd script_segments
     const segmentTimestamps: [number, number][] = [];
@@ -304,4 +346,43 @@ function calculateLipsyncIntervals(
     }
 
     return lipsyncIntervals;
+}
+
+async function trim_audio_to_segments_upload_and_choose_clip(
+    wavFile: string,
+    timestamps: AdjustedTimestamp[],
+): Promise<string[]> {
+    return Promise.all(timestamps.filter(timestamp => !timestamp.is_b_roll).map(async (timestamp) => {
+        const { start, end } = timestamp;
+        const fileName = `${wavFile}_trimmed_${start}_${end}.wav`;
+        const ffmpegCommand = `ffmpeg -i "${wavFile}" -ss ${start} -to ${end} -c copy "${outputFile}"`;
+        await execPromise(ffmpegCommand);
+        // Upload the trimmed audio file to Supabase
+        const fileBuffer = await fs.readFile(fileName);
+        const { data, error } = await supabase.storage
+            .from('audio-files')
+            .upload(fileName, fileBuffer, {
+                contentType: 'audio/wav',
+            });
+
+        if (error) {
+            console.error(`Error uploading file to Supabase: ${error.message}`);
+            throw error;
+        }
+
+        // Get the public URL of the uploaded file
+        const { data: { publicUrl }, error: urlError } = supabase.storage
+            .from('audio-files')
+            .getPublicUrl(fileName);
+
+        if (urlError) {
+            console.error(`Error getting public URL: ${urlError.message}`);
+            throw urlError;
+        }
+
+        // Clean up the local trimmed file
+        await fs.unlink(fileName);
+
+        return publicUrl;
+    }));
 }
