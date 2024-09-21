@@ -133,10 +133,6 @@ const generateScript = async (
     const overallScriptResponse = await openai.beta.chat.completions.parse({
         model: "gpt-4o-2024-08-06",
         messages: [
-            // {
-            //     role: "system",
-            //     content: overallScriptSystemPrompt,
-            // },
             {
                 role: "user",
                 content: overallScriptUserPrompt,
@@ -153,6 +149,12 @@ const generateScript = async (
         overallScriptResponse.choices[0].message.parsed ?? {
             segments: [],
         };
+
+    // // For debugging, change all the b-roll segments to candidate shots
+    // script.segments = script.segments.map((segment) => ({
+    //     ...segment,
+    //     is_b_roll: false,
+    // }));
 
     return script;
 };

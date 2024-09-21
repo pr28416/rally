@@ -22,7 +22,7 @@ async function generateVideo(
                 body: JSON.stringify({
                     videoUrl: request.videoUrl,
                     audioUrl: request.audioUrl,
-                    synergize: request.synergize || true,
+                    synergize: request.synergize || false,
                     model: request.model || "sync-1.7.1-beta",
                 }),
             });

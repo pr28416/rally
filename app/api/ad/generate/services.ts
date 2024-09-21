@@ -94,7 +94,7 @@ export async function generateAd(voter: VoterRecord) {
         segmentTimestamps,
     );
     // Adjust timestamps to accommodate B-roll segments
-    const adjustedTimestamps = adjustTimestamps(
+    const adjustedTimestamps = await adjustTimestamps(
         segmentTimestamps,
         filteredBRollSegments,
     );
@@ -362,16 +362,22 @@ function filterBRollSegments(
     );
 }
 
-function adjustTimestamps(
+async function adjustTimestamps(
     segmentTimestamps: [number, number][],
     filteredBRollSegments: (Video | null)[],
-): AdjustedTimestamp[] {
+): Promise<AdjustedTimestamp[]> {
     const adjustedTimestamps: AdjustedTimestamp[] = [];
+    const tempDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), "b-roll-processing-"),
+    );
+
     for (let i = 0; i < segmentTimestamps.length; i++) {
         const [start, end] = segmentTimestamps[i];
         const bRoll = filteredBRollSegments[i];
         if (bRoll) {
-            if (end - start > bRoll.duration) {
+            const segmentDuration = end - start;
+            if (segmentDuration > bRoll.duration) {
+                // B-roll is shorter than the segment, use it as is
                 adjustedTimestamps.push({
                     start,
                     end: start + bRoll.duration,
@@ -385,11 +391,17 @@ function adjustTimestamps(
                     b_roll_link: null,
                 });
             } else {
+                // B-roll needs to be cropped
+                const croppedBRollLink = await cropAndUploadBRoll(
+                    bRoll,
+                    segmentDuration,
+                    tempDir,
+                );
                 adjustedTimestamps.push({
                     start,
                     end,
                     is_b_roll: true,
-                    b_roll_link: bRoll.video_files[0].link,
+                    b_roll_link: croppedBRollLink,
                 });
             }
         } else {
@@ -401,7 +413,60 @@ function adjustTimestamps(
             });
         }
     }
+
+    // Clean up temporary directory
+    await fs.rm(tempDir, { recursive: true, force: true });
+
     return adjustedTimestamps;
+}
+
+async function cropAndUploadBRoll(
+    bRoll: Video,
+    duration: number,
+    tempDir: string,
+): Promise<string> {
+    const videoUrl = bRoll.video_files[0].link;
+    const tempFilePath = path.join(tempDir, `original_${uuidv4()}.mp4`);
+    const croppedFilePath = path.join(tempDir, `cropped_${uuidv4()}.mp4`);
+
+    try {
+        // Download the video
+        const response = await fetch(videoUrl);
+        const arrayBuffer = await response.arrayBuffer();
+        await fs.writeFile(tempFilePath, Buffer.from(arrayBuffer));
+
+        // Crop the video
+        const ffmpegCommand =
+            `ffmpeg -i "${tempFilePath}" -t ${duration} -c copy "${croppedFilePath}"`;
+        await safeExecPromise(ffmpegCommand);
+
+        // Upload the cropped video to Supabase
+        const fileBuffer = await fs.readFile(croppedFilePath);
+        const fileName = `cropped_b_roll_${uuidv4()}.mp4`;
+        const { error } = await supabase.storage
+            .from("broll")
+            .upload(fileName, fileBuffer, { contentType: "video/mp4" });
+
+        if (error) {
+            throw new Error(
+                `Error uploading cropped B-roll to Supabase: ${error.message}`,
+            );
+        }
+
+        // Get the public URL of the uploaded cropped video
+        const { data: { publicUrl } } = supabase.storage
+            .from("broll")
+            .getPublicUrl(fileName);
+
+        if (!publicUrl) {
+            throw new Error("Error getting public URL for cropped B-roll");
+        }
+
+        return publicUrl;
+    } catch (error) {
+        console.error("Error in cropAndUploadBRoll:", error);
+        throw error;
+    }
 }
 
 function combineFinalTimestamps(
@@ -493,7 +558,6 @@ async function trim_audio_to_segments_upload_and_choose_clip(
             throw new Error("Error getting public URL");
         }
 
-        await fs.unlink(fileName);
         console.log("Cleaned up local trimmed file");
         return publicUrl;
     };
@@ -591,8 +655,6 @@ async function choose_and_upload_face_clips(
                 .from("video-files/kamala-segments")
                 .getPublicUrl(`clip_${uniqueId}.mp4`);
 
-            await fs.unlink(videoFileClip);
-
             return publicUrl || null;
         }));
     } catch (error) {
@@ -664,15 +726,5 @@ async function stitch_clips(
     } catch (error) {
         console.error("Error in stitch_clips:", error);
         throw error;
-    } finally {
-        // Clean up temporary files
-        const filesToDelete = [
-            concatFile,
-            outputFile,
-            ...videoFiles,
-        ];
-        await Promise.all(
-            filesToDelete.map((file) => fs.unlink(file).catch(() => {})),
-        );
     }
 }
