@@ -1,7 +1,10 @@
+import { Database } from "@/lib/types/schema";
+import { generateScript } from "./services";
+
+type VoterRecord = Database["public"]["Tables"]["voter_records"]["Row"];
+
 export async function POST(req: Request) {
-  const { prompt } = await req.json();
-  console.log(prompt);
-  return new Response(JSON.stringify({ message: "Response from my route" }), {
-    headers: { 'Content-Type': 'application/json' },
-  });
+  const { voterRecord }: { voterRecord: VoterRecord } = await req.json();
+  const script = await generateScript(voterRecord);
+  return Response.json({ script });
 }
