@@ -83,10 +83,14 @@ body {
 }
 
 @layer base {
-  * {
+  /* * {
     @apply border-border;
-  }
-  body {
+  } */
+  /* body {
     @apply bg-background text-foreground;
-  }
+  } */
+}
+
+.blue-shadow {
+  box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.1), 0 2px 4px -1px rgba(59, 130, 246, 0.06);
 }

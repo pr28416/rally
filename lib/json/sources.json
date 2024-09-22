@@ -1,0 +1,19 @@
+{
+    "sources": [
+      {
+        "thumbnail": "/images/thumbnail1.png",
+        "title": "Kamala Harris Youtube Clip",
+        "description": "A recent Youtube clip of Kamala Harris speaking in an interview, we used this to tune a model to her voice."
+      },
+      {
+        "thumbnail": "/images/thumbnail2.png",
+        "title": "National Conference of State Legislatures",
+        "description": "A comprehensive database of current and pending state laws and regulations."
+      },
+      {
+        "thumbnail": "/images/thumbnail3.png",
+        "title": "Pexels Open Source Images",
+        "description": "A collection of high-quality, open-source, free-to-use images for various purposes."
+      }
+    ]
+  }
