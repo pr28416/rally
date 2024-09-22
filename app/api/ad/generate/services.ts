@@ -128,6 +128,16 @@ export async function generateAd(voter: VoterRecord) {
         path.join(os.tmpdir(), "video-processing-"),
     );
     const outputPath = path.join(tempDir, `final_output.mp4`);
+    // const disclaimerPath = path.join(
+    //     process.cwd(),
+    //     "public",
+    //     "images",
+    //     "disclaimer.png",
+    // );
+    // const intermediateOutputPath = path.join(
+    //     tempDir,
+    //     `intermediate_output.mp4`,
+    // );
 
     const inputs = [
         aiVideoTempPath,
@@ -170,11 +180,30 @@ export async function generateAd(voter: VoterRecord) {
         inputs.map((input) => `-i "${input}"`).join(" ")
     } -filter_complex "${filterComplex}" -map "[outv]" -map 0:a -c:v libx264 -c:a aac "${outputPath}"`;
 
-    // Execute the ffmpeg command
+    // Execute the ffmpeg command for B-roll overlay
     console.log("ffmpegCommand", ffmpegCommand);
     await execPromise(ffmpegCommand);
+    // // 13. Create a 4-second video from the disclaimer image
+    // const disclaimerVideoPath = path.join(tempDir, `disclaimer.mp4`);
+    // const createDisclaimerCommand =
+    //     `ffmpeg -loop 1 -i "${disclaimerPath}" -c:v libx264 -t 4 -pix_fmt yuv420p -vf "scale=1920:1080,fade=in:st=0:d=1,fade=out:st=3:d=1" "${disclaimerVideoPath}"`;
+    // await execPromise(createDisclaimerCommand);
 
-    // 13. Upload the final video to Supabase
+    // // 14. Concatenate the main video with the disclaimer video
+    // const concatListPath = path.join(tempDir, "concat_list.txt");
+    // await fs.writeFile(
+    //     concatListPath,
+    //     `file '${outputPath}'\nfile '${disclaimerVideoPath}'`,
+    // );
+
+    // const concatenateCommand =
+    //     `ffmpeg -f concat -safe 0 -i "${concatListPath}" -c copy "${intermediateOutputPath}"`;
+    // await execPromise(concatenateCommand);
+
+    // // Rename the intermediate output to the final output
+    // await fs.rename(intermediateOutputPath, outputPath);
+
+    // 15. Upload the final video to Supabase
     const finalVideoBuffer = await fs.readFile(outputPath);
     const finalVideoName = `final_ad_${uuidv4()}.mp4`;
     const { error: uploadError } = await supabase.storage
@@ -187,7 +216,7 @@ export async function generateAd(voter: VoterRecord) {
         throw new Error(`Error uploading final video: ${uploadError.message}`);
     }
 
-    // 14. Get the public URL of the uploaded video
+    // 16. Get the public URL of the uploaded video
     const { data: { publicUrl } } = supabase.storage
         .from("video-files")
         .getPublicUrl(finalVideoName);
@@ -196,11 +225,11 @@ export async function generateAd(voter: VoterRecord) {
         throw new Error("Failed to get public URL for final video");
     }
 
-    // 15. Clean up temporary files
+    // 17. Clean up temporary files
     await fs.rm(tempDir, { recursive: true, force: true });
     await fs.unlink(aiVideoTempPath);
 
-    // 16. Return the public URL of the final video
+    // 18. Return the public URL of the final video
     return { finalVideoUrl: publicUrl };
 }
 

@@ -62,11 +62,13 @@ const promptStyle2 = async (
     // First create a generic non-structured script
 
     const overallScriptSystemPrompt =
-        `Create a political campaign ad script for Kamala Harris that she will speak. Use the provided voter background, city information, and relevant campaign policies. There may be multiple policies discussed, but keep it concise and focus on one of the main critical issues and how Kamala Harris has currently addressed it or would address it. The output should be spoken voiceover content - The content that Kamala Harris would speak in her vocabulary and style of speech.
+        `Create a political campaign ad script for Kamala Harris that she will speak. Use the provided voter background, city information, and relevant campaign policies. There may be multiple policies discussed, but keep it concise and focus on one of the main critical issues and how Kamala Harris has currently addressed it or would address it, in the broader scope of America, while also discussing its impact on the voter given their background.. The output should be spoken voiceover content - The content that Kamala Harris would speak in her vocabulary and style of speech.
 
 Guidelines:
 - Keep the overall length to 30 seconds or less
-- Keep it really concise.`;
+- Keep it really concise.
+- Be willing to be forceful and passionate.
+- Feel free to mention anything you know about the voter other than their location if it helps shape the speech well. But don't go overboard.`;
 
     const overallScriptUserPrompt = [
         `Voter background: ${
@@ -128,7 +130,7 @@ Example structure:
       "is_b_roll": false
     },
     {
-      "spoken_transcript": "We see it in our communities",
+      "spoken_transcript": "We see it in our communities every day",
       "is_b_roll": true,
       "b_roll_search_query": "diverse crowd, city street"
     },
@@ -174,7 +176,36 @@ Ensure the structured output maintains the original message and Kamala Harris's 
         return acc;
     }, [] as z.infer<typeof AdSegmentArraySchema>["segments"]);
 
-    script.segments = combinedSegments;
+    // Merge short non-b-roll segments with following b-roll segments
+    const mergedSegments = combinedSegments.reduce((acc, segment, index) => {
+        if (
+            index > 0 &&
+            !acc[acc.length - 1].is_b_roll &&
+            segment.is_b_roll &&
+            acc[acc.length - 1].spoken_transcript.split(" ").length < 6
+        ) {
+            const lastSegment = acc[acc.length - 1];
+            lastSegment.spoken_transcript += " " + segment.spoken_transcript;
+            lastSegment.is_b_roll = false;
+            if (segment.b_roll_search_query) {
+                lastSegment.b_roll_search_query = segment.b_roll_search_query;
+            }
+        } else {
+            acc.push(segment);
+        }
+        return acc;
+    }, [] as z.infer<typeof AdSegmentArraySchema>["segments"]);
+
+    // Ensure the last segment is not b-roll
+    if (
+        mergedSegments.length > 0 &&
+        mergedSegments[mergedSegments.length - 1].is_b_roll
+    ) {
+        mergedSegments[mergedSegments.length - 1].is_b_roll = false;
+        delete mergedSegments[mergedSegments.length - 1].b_roll_search_query;
+    }
+
+    script.segments = mergedSegments;
 
     return script;
 };

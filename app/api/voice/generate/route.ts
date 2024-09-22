@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     model_id: "sonic-english",
     voice: {
       mode: "id",
-      id: "41534e16-2966-4c6b-9670-111411def906",
+      id: "6c9d83f7-a2c1-4a85-afab-e0a8e26a9231",
     },
     transcript: transcript,
     add_timestamps: true,
