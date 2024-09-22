@@ -129,7 +129,7 @@ export async function generateAd(voter: VoterRecord) {
     const croppedBRollVideos = await Promise.all(
         filtered_b_roll_with_timestamps.map(async (bRoll, index) => {
             const { video, start, end } = bRoll;
-            const requiredDuration = end - start;
+            const requiredDuration = Math.max(end - start, 5);
             const tempDir = await fs.mkdtemp(
                 path.join(os.tmpdir(), "broll-cropping-"),
             );
@@ -158,7 +158,7 @@ export async function generateAd(voter: VoterRecord) {
             return {
                 outputPath,
                 start,
-                end: Math.min(start + video.duration, end),
+                end: Math.max(Math.min(start + video.duration, end), start + 5),
             };
         }).filter((v) => v !== null),
     );
@@ -188,6 +188,7 @@ export async function generateAd(voter: VoterRecord) {
     for (let i = 0; i < croppedBRollVideos.length; i++) {
         const bRoll = croppedBRollVideos[i];
         if (!bRoll) {
+            console.log("bRoll is null");
             continue;
         }
         const inputIndex = i + 1; // Since input 0 is the main video
@@ -206,7 +207,7 @@ export async function generateAd(voter: VoterRecord) {
         overlayChains += `
             ${lastOutput}[v${i}]overlay=enable='between(t,${startTime},${
             startTime + duration
-        })':x=(W-w)/2:y=(H-h)/2${nextOutput === "[outv]" ? "" : nextOutput};
+        })':x=(W-w)/2:y=(H-h)/2${nextOutput};
         `;
         lastOutput = nextOutput;
     }
