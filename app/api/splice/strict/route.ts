@@ -20,7 +20,7 @@ const execPromise = util.promisify(exec);
 export async function POST(request: Request) {
   try {
     // Get request body
-    const { baseVideoTimestamp, brollTimestamps } = await request.json();
+    const { brollTimestamps } = await request.json();
 
     // Download base video
     const baseVideoName = "kamala_clip_1.mp4"; 
