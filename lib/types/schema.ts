@@ -114,6 +114,53 @@ export type Database = {
         }
         Relationships: []
       }
+      clip_lengths: {
+        Row: {
+          clip_name: string
+          length: number
+        }
+        Insert: {
+          clip_name: string
+          length: number
+        }
+        Update: {
+          clip_name?: string
+          length?: number
+        }
+        Relationships: []
+      }
+      video_map: {
+        Row: {
+          city_id: string | null
+          created_at: string
+          id: string
+          script: Json | null
+          video_url: string
+        }
+        Insert: {
+          city_id?: string | null
+          created_at?: string
+          id?: string
+          script?: Json | null
+          video_url: string
+        }
+        Update: {
+          city_id?: string | null
+          created_at?: string
+          id?: string
+          script?: Json | null
+          video_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_map_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       voter_records: {
         Row: {
           age: number | null
@@ -155,7 +202,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_unique_voter_records: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          age: number | null
+          campaigns_donated_to: string[] | null
+          city: string | null
+          first_name: string
+          id: string
+          last_name: string
+          nonprofits_donated_to: string[] | null
+          party_affiliation: string | null
+          state: string | null
+        }[]
+      }
     }
     Enums: {
       topic_enum:

@@ -64,6 +64,11 @@ export function DataTableWithHighlight<TData, TValue>({
       setHighlightedText(selection.toString().trim())
       setTooltipPosition({ x: rect.left, y: rect.top - 30 })
       setShowTooltip(true)
+
+      // Set a timer to hide the tooltip after 3 seconds
+      setTimeout(() => {
+        setShowTooltip(false)
+      }, 3000)
     } else {
       setShowTooltip(false)
     }
@@ -162,24 +167,24 @@ export function DataTableWithHighlight<TData, TValue>({
         </Button>
       </div>
       {showTooltip && (
-      <TooltipProvider>
-      <Tooltip open={showTooltip}>
-        <TooltipTrigger asChild>
-          <div
-            style={{
-              position: 'fixed',
-              left: `${tooltipPosition.x}px`,
-              top: `${tooltipPosition.y}px`,
-              width: '1px',
-              height: '1px',
-            }}
-          />
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>Press Enter to Chat</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip open={showTooltip}>
+            <TooltipTrigger asChild>
+              <div
+                style={{
+                  position: 'fixed',
+                  left: `${tooltipPosition.x}px`,
+                  top: `${tooltipPosition.y}px`,
+                  width: '1px',
+                  height: '1px',
+                }}
+              />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Press Enter to Chat</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
     </div>
   )

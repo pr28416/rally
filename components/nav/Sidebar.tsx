@@ -266,10 +266,12 @@ const NavButton = ({
   if (isCollapsed) {
     return (
       <TooltipProvider>
-      <Tooltip delayDuration={0}>
-        <TooltipTrigger>{wrappedContent}</TooltipTrigger>
-        <TooltipContent side="right">{item.label}</TooltipContent>
-      </Tooltip>
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>{wrappedContent}</TooltipTrigger>
+          <TooltipContent side="right" className="z-[200000]">
+            {item.label}
+          </TooltipContent>
+        </Tooltip>
       </TooltipProvider>
     )
   }
@@ -287,32 +289,32 @@ const CollapseButton = ({
   return (
     <div className="hidden md:flex items-center justify-center">
       <TooltipProvider>
-      <Tooltip delayDuration={0}>
-        <TooltipTrigger asChild>
-          <Button
-            onClick={(e) => {
-              e.stopPropagation()
-              toggleCollapse()
-            }}
-            variant="outline"
-            className="w-6 h-6 rounded-full p-0 flex items-center justify-center bg-neutral-100 shadow-md"
-          >
-            <ChevronLeftIcon
-              className={cn(
-                "w-4 h-4 transition-transform text-neutral-500",
-                isCollapsed ? "rotate-180" : "",
-              )}
-            />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="right">
-          <div className="flex items-center space-x-2">
-            <span>{isCollapsed ? "Expand" : "Collapse"} sidebar</span>
-            <div className="flex items-center space-x-1 text-xs text-gray-500">
-              <CommandIcon className="w-3 h-3" />
-              <span>E</span>
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <Button
+              onClick={(e) => {
+                e.stopPropagation()
+                toggleCollapse()
+              }}
+              variant="outline"
+              className="w-6 h-6 rounded-full p-0 flex items-center justify-center bg-neutral-100 shadow-md"
+            >
+              <ChevronLeftIcon
+                className={cn(
+                  "w-4 h-4 transition-transform text-neutral-500",
+                  isCollapsed ? "rotate-180" : "",
+                )}
+              />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="z-[40000]">
+            <div className="flex items-center space-x-2">
+              <span>{isCollapsed ? "Expand" : "Collapse"} sidebar</span>
+              <div className="flex items-center space-x-1 text-xs text-gray-500">
+                <CommandIcon className="w-3 h-3" />
+                <span>E</span>
+              </div>
             </div>
-          </div>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
