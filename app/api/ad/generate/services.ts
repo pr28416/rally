@@ -70,6 +70,11 @@ type AudioResponse = {
     audio: string;
     wordTimings: [string, number, number][];
 };
+type VideoWithTimings = {
+    video: Video;
+    start: number;
+    end: number;
+};
 
 // Main function to generate an ad for a given voter
 export async function generateAd(voter: VoterRecord) {
@@ -87,17 +92,311 @@ export async function generateAd(voter: VoterRecord) {
         script_segments,
         audio_response.wordTimings,
     );
+    // 6. Filter b-roll options based on b-roll timestamps
+    const filtered_b_roll_with_timestamps: VideoWithTimings[] =
+        await filterBRollOptions(b_roll_options, b_roll_timestamps);
 
-    return {
-        script_segments,
-        b_roll_timestamps,
-        audio_timestamps: b_roll_timestamps.map(([start, end]) =>
-            audio_response.wordTimings.filter(([_, wordStart, wordEnd]) =>
-                wordStart >= start && wordEnd <= end
-            )
-        ),
-        b_roll_options,
-    };
+    // 7. Get AI mask video url from supabase
+    const { data: { publicUrl: video_url } } = await supabase.storage.from(
+        "video-files",
+    )
+        .getPublicUrl("kamala_clip_1.mp4");
+    console.log("video_url", video_url);
+
+    // Upload audio to supabase and get public url
+    const { publicUrl: audio_url } = await upload_audio_to_supabase(
+        audio_response.audio,
+    );
+
+    // 9. Generate AI video without cropped B-roll
+    const ai_generated_video = await generateVideo({
+        videoUrl: video_url,
+        audioUrl: audio_url,
+    });
+
+    if (ai_generated_video.error) {
+        throw new Error("Error generating AI video");
+    } else if (!ai_generated_video.resultUrl) {
+        throw new Error("AI video generation failed");
+    }
+
+    // 10. Crop B-roll videos to match allocated time
+    const croppedBRollVideos = await Promise.all(
+        filtered_b_roll_with_timestamps.map(async (bRoll, index) => {
+            const { video, start, end } = bRoll;
+            const requiredDuration = end - start;
+            const tempDir = await fs.mkdtemp(
+                path.join(os.tmpdir(), "broll-cropping-"),
+            );
+            const inputPath = path.join(tempDir, `input${index}.mp4`);
+            const outputPath = path.join(tempDir, `output${index}.mp4`);
+
+            try {
+                // Download the video
+                const response = await fetch(video.video_files[0].link);
+                const buffer = Buffer.from(await response.arrayBuffer());
+                await fs.writeFile(inputPath, buffer);
+
+                if (video.duration > requiredDuration) {
+                    // Crop the video
+                    const ffmpegCommand =
+                        `ffmpeg -i "${inputPath}" -t ${requiredDuration} -c copy "${outputPath}"`;
+                    console.log("ffmpegCommand", ffmpegCommand);
+                    await execPromise(ffmpegCommand);
+                }
+            } catch (error) {
+                console.error("Error in cropping B-roll:", error);
+                await fs.rm(tempDir, { recursive: true, force: true });
+                return null; // Return original if cropping fails
+            }
+            // Return the output path, it's start timestamp, and its actual end timestamp (could be less than required)
+            return {
+                outputPath,
+                start,
+                end: Math.min(start + video.duration, end),
+            };
+        }).filter((v) => v !== null),
+    );
+
+    // 11. Download the AI generated video
+    const aiVideoTempPath = path.join(os.tmpdir(), `ai_video_${uuidv4()}.mp4`);
+    const aiVideoResponse = await fetch(ai_generated_video.resultUrl);
+    const aiVideoBuffer = await aiVideoResponse.arrayBuffer();
+    await fs.writeFile(aiVideoTempPath, Buffer.from(aiVideoBuffer));
+
+    // const aiVideoTempPath =
+    //     await download_video_from_supabase_to_local_and_return_path(
+    //         "https://tahxhxsokddewdboefsg.supabase.co/storage/v1/object/sign/kamala-clips/kamala_clip_1.mp4?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJrYW1hbGEtY2xpcHMva2FtYWxhX2NsaXBfMS5tcDQiLCJpYXQiOjE3MjY5NjY2MDQsImV4cCI6MTcyNzU3MTQwNH0.bEYqOXeu46J0WvMX9NGLJBCHAIuGiBYU1DGui6MvoSA&t=2024-09-22T00%3A56%3A44.163Z",
+    //         "kamala-clips",
+    //     );
+    // const bRollTempPaths = await Promise.all([
+    //     "https://tahxhxsokddewdboefsg.supabase.co/storage/v1/object/public/broll/cropped_b_roll_094bc04e-8bbf-4032-8e97-b6cf009beaf0.mp4",
+    // ].map(async (bRoll) => {
+    //     if (bRoll) {
+    //         return await download_video_from_supabase_to_local_and_return_path(
+    //             bRoll,
+    //             "broll",
+    //         );
+    //     }
+    //     return null;
+    // }));
+
+    async function overlayBRollOnVideo(
+        mainVideoPath: string,
+        bRollPath: string,
+        start: number,
+        end: number,
+        outputPath: string,
+    ): Promise<string> {
+        const ffmpegCommand = `ffmpeg -i "${mainVideoPath}" -i "${bRollPath}" \
+            -filter_complex "[1:v]setpts=PTS-${start}/TB[a]; \
+                             [0:v][a]overlay=enable='between(t,${start},${end})':shortest=1[out]" \
+            -map "[out]" -map 0:a \
+            -c:v libx264 -crf 18 -pix_fmt yuv420p \
+            -c:a copy \
+            "${outputPath}"`;
+
+        console.log("Overlay ffmpeg command:", ffmpegCommand);
+        await safeExecPromise(ffmpegCommand);
+        return outputPath;
+    }
+
+    // 12. Overlay B-roll videos on the AI generated video
+    let myCurrentVideoPath = aiVideoTempPath;
+    for (const bRoll of croppedBRollVideos) {
+        if (bRoll) {
+            console.log("Processing B-roll:", bRoll);
+            const { outputPath, start, end } = bRoll;
+            const newOutputPath = path.join(
+                os.tmpdir(),
+                `output_${uuidv4()}.mp4`,
+            );
+            await overlayBRollOnVideo(
+                myCurrentVideoPath,
+                outputPath,
+                start,
+                end,
+                newOutputPath,
+            );
+            myCurrentVideoPath = newOutputPath;
+        }
+    }
+
+    // The final video is now in currentVideoPath
+    console.log("Final video path:", myCurrentVideoPath);
+
+    // Continue with uploading the final video to Supabase...
+
+    // 13. Upload the final video to Supabase
+    const finalVideoBuffer = await fs.readFile(myCurrentVideoPath);
+    const finalVideoName = `final_video_${uuidv4()}.mp4`;
+    console.log("finalVideoName", finalVideoName);
+    const { error } = await supabase.storage
+        .from("video-files")
+        .upload(finalVideoName, finalVideoBuffer, {
+            contentType: "video/mp4",
+        });
+
+    if (error) {
+        throw new Error(
+            `Error uploading final video to Supabase: ${error.message}`,
+        );
+    }
+
+    // Get the public URL of the uploaded final video
+    const { data: finalVideoUrl } = supabase.storage
+        .from("video-files")
+        .getPublicUrl(finalVideoName);
+
+    if (!finalVideoUrl) {
+        throw new Error("Error getting public URL for final video");
+    }
+
+    // // Clean up temporary files
+    // await fs.unlink(aiVideoTempPath);
+    // await fs.unlink(currentVideoPath);
+
+    // if (aiVideoTempPath && bRollTempPaths[0]) {
+    //     const outputPath = await overlayBRollOnVideo(
+    //         aiVideoTempPath,
+    //         bRollTempPaths[0],
+    //         0,
+    //         10,
+    //         "output.mp4",
+    //     );
+    //     return { outputPath };
+    // }
+
+    return { final_video_url: finalVideoUrl.publicUrl };
+
+    // In the generateAd function, replace the existing B-roll overlay loop with this:
+    let currentVideoPath = aiVideoTempPath;
+    for (const bRoll of croppedBRollVideos) {
+        if (bRoll) {
+            console.log("Processing B-roll:", bRoll);
+            const { outputPath, start, end } = bRoll;
+            const newOutputPath = path.join(
+                os.tmpdir(),
+                `output_${uuidv4()}.mp4`,
+            );
+
+            await overlayBRollOnVideo(
+                currentVideoPath,
+                outputPath,
+                start,
+                end,
+                newOutputPath,
+            );
+
+            // Clean up the previous temporary file if it's not the original AI video
+            // if (currentVideoPath !== aiVideoTempPath) {
+            //     await fs.unlink(currentVideoPath);
+            // }
+
+            currentVideoPath = newOutputPath;
+        }
+    }
+
+    // The final video is now in currentVideoPath
+    console.log("Final video path:", currentVideoPath);
+
+    // Continue with uploading the final video to Supabase...
+
+    // 12. Overlay B-roll videos on the AI generated video
+    // const outputPath = path.join(os.tmpdir(), `final_video_${uuidv4()}.mp4`);
+    // let filterComplex = "";
+    // let overlayInputs = "";
+    // let muteAudio = "";
+
+    // for (let i = 0; i < croppedBRollVideos.length; i++) {
+    //     const bRoll = croppedBRollVideos[i];
+    //     if (bRoll && "outputPath" in bRoll) {
+    //         overlayInputs += ` -i "${bRoll.outputPath}"`;
+    //         if (i === 0) {
+    //             filterComplex +=
+    //                 `[0:v][1:v]overlay=enable='between(t,${bRoll.start},${bRoll.end})'[v1];`;
+    //         } else {
+    //             filterComplex += `[v${i}][${
+    //                 i + 1
+    //             }:v]overlay=enable='between(t,${bRoll.start},${bRoll.end})'[v${
+    //                 i + 1
+    //             }];`;
+    //         }
+    //         muteAudio += `[${i + 1}:a]volume=0[muted${i + 1}];`;
+    //     }
+    // }
+
+    // // Remove the last semicolon and add output label
+    // filterComplex = filterComplex.slice(0, -1) + `[vout]`;
+
+    // const ffmpegCommand =
+    //     `ffmpeg -i "${aiVideoTempPath}"${overlayInputs} -filter_complex "${filterComplex};${muteAudio}" -map "[vout]" -map 0:a -c:a copy "${outputPath}"`;
+
+    // try {
+    //     await execPromise(ffmpegCommand);
+    //     console.log("Video overlay completed successfully");
+
+    //     // 13. Upload the final video to Supabase
+    //     const finalVideoBuffer = await fs.readFile(outputPath);
+    //     const finalVideoName = `final_video_${uuidv4()}.mp4`;
+    //     console.log("finalVideoName", finalVideoName);
+    //     const { error } = await supabase.storage
+    //         .from("video-files")
+    //         .upload(finalVideoName, finalVideoBuffer, {
+    //             contentType: "video/mp4",
+    //         });
+
+    //     if (error) {
+    //         throw new Error(
+    //             `Error uploading final video to Supabase: ${error.message}`,
+    //         );
+    //     }
+
+    //     // Get the public URL of the uploaded final video
+    //     const { data: finalVideoUrl } = supabase.storage
+    //         .from("video-files")
+    //         .getPublicUrl(finalVideoName);
+
+    //     if (!finalVideoUrl) {
+    //         throw new Error("Error getting public URL for final video");
+    //     }
+
+    //     // Clean up temporary files
+    //     await fs.unlink(aiVideoTempPath);
+    //     await fs.unlink(outputPath);
+    //     for (const bRoll of croppedBRollVideos) {
+    //         if (bRoll && "outputPath" in bRoll) {
+    //             await fs.unlink(bRoll.outputPath);
+    //         }
+    //     }
+
+    //     // Add the final video URL to the return object
+    //     return {
+    //         final_video_url: finalVideoUrl.publicUrl,
+    //         script_segments,
+    //         b_roll_timestamps,
+    //         audio_timestamps: b_roll_timestamps.map(([start, end]) =>
+    //             audio_response.wordTimings.filter((arr) =>
+    //                 arr[1] >= start && arr[2] <= end
+    //             )
+    //         ),
+    //         b_roll_options,
+    //     };
+    // } catch (error) {
+    //     console.error("Error in video overlay process:", error);
+    //     throw error;
+    // }
+
+    // return {
+    //     script_segments,
+    //     b_roll_timestamps,
+    //     audio_timestamps: b_roll_timestamps.map(([start, end]) =>
+    //         audio_response.wordTimings.filter(([_, wordStart, wordEnd]) =>
+    //             wordStart >= start && wordEnd <= end
+    //         )
+    //     ),
+    //     b_roll_options,
+    // };
     // // 5. Convert and save the generated audio to a temporary file
     // const { wavFile } = await convertAndSaveTempAudio(audio_response.audio);
     // // 6. Construct timestamps for each segment of the script
@@ -191,6 +490,149 @@ export async function generateAd(voter: VoterRecord) {
     // };
 }
 
+async function download_video_from_supabase_to_local_and_return_path(
+    video_url: string,
+    location: string,
+): Promise<string> {
+    // Extract the file name from the URL
+    const fileName = video_url.split("/").pop();
+    if (!fileName) {
+        throw new Error("Invalid video URL");
+    }
+
+    // Get the public URL for the file
+    const { data } = await supabase.storage.from(location).getPublicUrl(
+        fileName,
+    );
+    if (!data.publicUrl) {
+        console.error("Error fetching video file:", data.publicUrl);
+        throw new Error("Failed to fetch video file from Supabase");
+    }
+
+    // Create a temporary directory
+    const tempDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), "video-processing-"),
+    );
+    const tempFilePath = path.join(tempDir, fileName);
+
+    try {
+        // Download the file
+        const response = await fetch(data.publicUrl);
+        if (!response.ok) {
+            throw new Error(`Failed to download video: ${response.statusText}`);
+        }
+
+        // Write the file to the temporary directory
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        await fs.writeFile(tempFilePath, buffer);
+
+        return tempFilePath;
+    } catch (error) {
+        // Clean up the temporary directory in case of an error
+        await fs.rm(tempDir, { recursive: true, force: true });
+        throw error;
+    }
+}
+
+async function upload_audio_to_supabase(
+    audio: string,
+): Promise<{ publicUrl: string }> {
+    const filename = `audio_${Date.now()}`;
+    console.log("filename", filename);
+
+    const tempDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), "video-processing-"),
+    );
+    console.log("tempDir", tempDir);
+
+    // Decode base64 audio string
+    const audioBuffer = Buffer.from(audio, "base64");
+
+    // Save the PCM file locally
+    const localPcmPath = path.join(tempDir, `${filename}.pcm`);
+    console.log("localPcmPath", localPcmPath);
+    await fs.writeFile(localPcmPath, audioBuffer);
+
+    // Run ffmpeg command to convert PCM to WAV
+    const localWAVPath = path.join(tempDir, `${filename}.wav`);
+    console.log("localWAVPath", localWAVPath);
+    const ffmpegCommand =
+        `ffmpeg -f f32le -i "${localPcmPath}" "${localWAVPath}"`;
+    console.log("ffmpegCommand", ffmpegCommand);
+    await execPromise(ffmpegCommand);
+
+    const wavFileStats = await fs.stat(localWAVPath);
+    console.log("WAV file size:", wavFileStats.size);
+
+    // Read the WAV file
+    const fileBuffer = await fs.readFile(localWAVPath);
+
+    // Upload to Supabase
+    const { error } = await supabase.storage
+        .from("audio-files")
+        .upload(`${filename}.wav`, fileBuffer, { contentType: "audio/wav" });
+
+    if (error) {
+        console.error(`Error uploading file to Supabase: ${error.message}`);
+        throw error;
+    }
+
+    const { data } = supabase.storage
+        .from("audio-files")
+        .getPublicUrl(`${filename}.wav`);
+
+    if (!data || !data.publicUrl) {
+        throw new Error("Failed to get public URL for uploaded audio");
+    }
+
+    // Clean up temporary files
+    await fs.unlink(localPcmPath);
+    await fs.unlink(localWAVPath);
+    await fs.rmdir(tempDir);
+
+    return { publicUrl: data.publicUrl };
+}
+
+async function getAIVideoMask(video_url: string): Promise<string> {
+    const { data: { publicUrl } } = await supabase.storage.from("video-files")
+        .getPublicUrl(video_url);
+    if (!publicUrl) {
+        console.error("Error fetching video file:", publicUrl);
+        throw new Error("Failed to fetch video file from Supabase");
+    }
+    return publicUrl;
+}
+
+async function decodeConvertAudio(
+    audioBase64: string,
+): Promise<{ wavFile: string }> {
+    const audioBuffer = Buffer.from(audioBase64, "base64");
+
+    // Generate a unique filename
+    const filename = `audio_${Date.now()}`;
+    console.log("filename", filename);
+
+    const tempDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), "video-processing-"),
+    );
+    console.log("tempDir", tempDir);
+
+    // Save the PCM file locally
+    const localPcmPath = path.join(tempDir, `${filename}.pcm`);
+    console.log("localPcmPath", localPcmPath);
+    await fs.writeFile(localPcmPath, audioBuffer);
+
+    // Run ffmpeg command to convert PCM to WAV
+    const localWAVPath = path.join(tempDir, `${filename}.wav`);
+    console.log("localWAVPath", localWAVPath);
+    const ffmpegCommand =
+        `ffmpeg -f f32le -i "${localPcmPath}" "${localWAVPath}"`;
+    console.log("ffmpegCommand", ffmpegCommand);
+    await execPromise(ffmpegCommand);
+    return { wavFile: localWAVPath };
+}
+
 async function getBRollTimestamps(
     segments: z.infer<typeof AdSegmentSchema>[],
     wordTimings: [string, number, number][],
@@ -254,6 +696,20 @@ async function getBRollTimestamps(
 //     }
 //     chunkIdx += 1
 // }
+
+function filterBRollOptions(
+    b_roll_options: Video[][],
+    b_roll_timestamps: [number, number][],
+): VideoWithTimings[] {
+    return b_roll_timestamps
+        .map(([start, end], index) => {
+            const video = b_roll_options[index]?.find((v) =>
+                v.duration >= end - start - 2
+            );
+            return video ? { video, start, end } : null;
+        })
+        .filter((v): v is VideoWithTimings => v !== null);
+}
 
 async function PromiseAllBatch<T>(
     promises: Promise<T>[],
@@ -528,8 +984,8 @@ async function cropAndUploadBRoll(
     try {
         // Download the video
         const response = await fetch(videoUrl);
-        const arrayBuffer = await response.arrayBuffer();
-        await fs.writeFile(tempFilePath, Buffer.from(arrayBuffer));
+        const buffer = Buffer.from(await response.arrayBuffer());
+        await fs.writeFile(tempFilePath, buffer);
 
         // Crop the video
         const ffmpegCommand =
@@ -823,4 +1279,43 @@ async function stitch_clips(
         console.error("Error in stitch_clips:", error);
         throw error;
     }
+}
+async function crop_audio_to_video(
+    audio_url: string,
+    duration: number,
+): Promise<string> {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "audio-cropping-"));
+    const outputFile = path.join(tempDir, `cropped_audio_${uuidv4()}.mp3`);
+
+    const ffmpegCommand =
+        `ffmpeg -i "${audio_url}" -t ${duration} -c copy "${outputFile}"`;
+    await execPromise(ffmpegCommand);
+
+    const fileBuffer = await fs.readFile(outputFile);
+    const fileName = `cropped_audio_${uuidv4()}.mp3`;
+
+    const { error } = await supabase.storage
+        .from("audio-files")
+        .upload(fileName, fileBuffer, { contentType: "audio/mpeg" });
+
+    if (error) {
+        console.error(
+            `Error uploading cropped audio to Supabase: ${error.message}`,
+        );
+        throw error;
+    }
+
+    const { data } = supabase.storage
+        .from("audio-files")
+        .getPublicUrl(fileName);
+
+    if (!data || !data.publicUrl) {
+        throw new Error("Failed to get public URL for uploaded audio");
+    }
+
+    // Clean up temporary files
+    await fs.unlink(outputFile);
+    await fs.rmdir(tempDir);
+
+    return data.publicUrl;
 }
