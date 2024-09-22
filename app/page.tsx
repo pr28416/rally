@@ -24,6 +24,7 @@ const ReactPlayer = dynamic(() => import('react-player'), { ssr: false });
 import Image from "next/image";
 import { useCardStack } from "@/app/components/CardStack";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast"
 
 const AnimatedHeader = ({ title, subtitle }: { title: string; subtitle?: string }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -73,6 +74,8 @@ const PartyIcon = ({ party, className }: { party: Party; className?: string }) =
 };
 
 export default function Home() {
+  const { toast } = useToast()
+
   const [cityData, setCityData] = useState<Database['public']['Tables']['cities']['Row'] | null>(null);
   const [voters, setVoters] = useState<Database['public']['Tables']['voter_records']['Row'][]>([]);
   const [selectedVoter, setSelectedVoter] = useState<string | null>(null);
@@ -86,6 +89,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [voterData, setVoterData] = useState<Database['public']['Tables']['voter_records']['Row'] | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationStatus, setGenerationStatus] = useState<string>("");
 
   const [cardItems, setCardItems] = useState<Array<{ id: number; name: string; designation: string; icon: IconType; content: React.ReactNode }>>([]);
   const { cards, setCards, shuffleToNext } = useCardStack();
@@ -297,11 +301,57 @@ export default function Home() {
     // ... other timestamps
   ];
 
-  const handleGenerateVideo = () => {
+  const handleGenerateVideo = async () => {
+    console.log("CALLED");
     setIsGenerating(true);
-    // TODO: Implement video generation logic
-    setTimeout(() => setIsGenerating(false), 2000); // Simulating generation process
+    setGenerationStatus("Initializing video generation...");
+  
+    try {
+      const response = await fetch('/api/ad/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          voterRecord: voterData,
+        }),
+      });
+  
+      if (!response.ok) {
+        throw new Error('Failed to generate video');
+      }
+  
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+  
+      while (true) {
+        const { done, value } = await reader!.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        setGenerationStatus(chunk.replace(/data:\s*/g, '').trim());      
+      }
+  
+      toast({
+        title: "Video Generated!",
+        description: "Your AI-powered political ad has been created successfully.",
+      });
+    } catch (error) {
+      console.error('Error generating video:', error);
+      toast({
+        title: "Generation Failed",
+        description: "There was an error generating the video. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
+
+  useEffect(() => {
+    if (generationStatus) {
+      console.log("Generation Status:", generationStatus);
+    }
+  }, [generationStatus]);
 
   const { sources } = sourcesData;
 
@@ -622,7 +672,7 @@ export default function Home() {
                 className="text-white bg-blue-400 border-blue-400 hover:bg-blue-300 transition-all duration-200 px-3 py-[18px] mb-2 mt-4 rounded-md shadow-sm"
               >
                 <RefreshCw className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
-                {isGenerating ? 'Generating...' : 'Generate Video'}
+                {isGenerating ? (generationStatus ? generationStatus : 'Generating...') : 'Generate Video'}
               </Button>
             </div>
             <div onClick={(e) => e.metaKey && handleCommandClick(

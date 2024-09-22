@@ -13,6 +13,7 @@ import { promises as fs } from "fs";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 import { generateVideo } from "../../video/generate/services";
+import { EventEmitter } from 'events';
 
 const execPromise = util.promisify(exec);
 
@@ -28,43 +29,56 @@ type VideoWithTimings = {
     end: number;
 };
 
+export const adEventEmitter = new EventEmitter();
+
 // Main function to generate an ad for a given voter
 export async function generateAd(voter: VoterRecord) {
+    adEventEmitter.emit('status', 'Starting ad generation');
     // 1. Get script segments
     const script_segments: z.infer<typeof AdSegmentSchema>[] =
         await getScriptSegments(voter);
+    adEventEmitter.emit('status', 'Script segments retrieved');
     // 2. Combine all script segments into a full transcript
     const full_transcript: string = getFullTranscript(script_segments);
+    adEventEmitter.emit('status', 'Full transcript generated');
     // 3. Generate audio from full transcript
     const audio_response: AudioResponse = await generateAudio(full_transcript);
+    adEventEmitter.emit('status', 'Audio generated');
     // 4. Generate B-roll options
     const b_roll_options = await generateBRollOptions(script_segments);
+    adEventEmitter.emit('status', 'B-roll options generated');
     // 5. Get b-roll timestamps
     const b_roll_timestamps = await getBRollTimestamps(
         script_segments,
         audio_response.wordTimings,
     );
+    adEventEmitter.emit('status', 'B-roll timestamps retrieved');
     // 6. Filter b-roll options based on b-roll timestamps
     const filtered_b_roll_with_timestamps: VideoWithTimings[] =
         await filterBRollOptions(b_roll_options, b_roll_timestamps);
+    adEventEmitter.emit('status', 'Filtered B-roll options');
 
     // 7. Get AI mask video url from supabase
     const { data: { publicUrl: video_url } } = await supabase.storage.from(
         "video-files",
     )
         .getPublicUrl("kamala_clip_1.mp4");
+    adEventEmitter.emit('status', 'AI mask video URL retrieved');
     console.log("video_url", video_url);
 
     // Upload audio to supabase and get public url
     const { publicUrl: audio_url } = await upload_audio_to_supabase(
         audio_response.audio,
     );
+    adEventEmitter.emit('status', 'Audio uploaded to Supabase');
 
     // 9. Generate AI video without cropped B-roll
+    adEventEmitter.emit('status', 'Generating AI base video');
     const ai_generated_video = await generateVideo({
         videoUrl: video_url,
         audioUrl: audio_url,
     });
+    adEventEmitter.emit('status', 'AI base video generated');
 
     if (ai_generated_video.error) {
         throw new Error("Error generating AI video");
@@ -78,6 +92,7 @@ export async function generateAd(voter: VoterRecord) {
     );
 
     // 10. Crop B-roll videos to match allocated time
+    adEventEmitter.emit('status', 'Cropping B-roll videos');
     const croppedBRollVideos = await Promise.all(
         filtered_b_roll_with_timestamps.map(async (bRoll, index) => {
             const { video, start, end } = bRoll;
@@ -114,6 +129,7 @@ export async function generateAd(voter: VoterRecord) {
             };
         }).filter((v) => v !== null),
     );
+    adEventEmitter.emit('status', 'B-roll videos cropped');
 
     console.log("croppedBRollVideos", croppedBRollVideos);
 
@@ -122,6 +138,7 @@ export async function generateAd(voter: VoterRecord) {
     const aiVideoResponse = await fetch(ai_generated_video.resultUrl);
     const aiVideoBuffer = await aiVideoResponse.arrayBuffer();
     await fs.writeFile(aiVideoTempPath, Buffer.from(aiVideoBuffer));
+    adEventEmitter.emit('status', 'AI video downloaded');
 
     // 12. Overlay B-roll videos on the AI generated video
     const tempDir = await fs.mkdtemp(
@@ -183,27 +200,8 @@ export async function generateAd(voter: VoterRecord) {
     // Execute the ffmpeg command for B-roll overlay
     console.log("ffmpegCommand", ffmpegCommand);
     await execPromise(ffmpegCommand);
-    // // 13. Create a 4-second video from the disclaimer image
-    // const disclaimerVideoPath = path.join(tempDir, `disclaimer.mp4`);
-    // const createDisclaimerCommand =
-    //     `ffmpeg -loop 1 -i "${disclaimerPath}" -c:v libx264 -t 4 -pix_fmt yuv420p -vf "scale=1920:1080,fade=in:st=0:d=1,fade=out:st=3:d=1" "${disclaimerVideoPath}"`;
-    // await execPromise(createDisclaimerCommand);
 
-    // // 14. Concatenate the main video with the disclaimer video
-    // const concatListPath = path.join(tempDir, "concat_list.txt");
-    // await fs.writeFile(
-    //     concatListPath,
-    //     `file '${outputPath}'\nfile '${disclaimerVideoPath}'`,
-    // );
-
-    // const concatenateCommand =
-    //     `ffmpeg -f concat -safe 0 -i "${concatListPath}" -c copy "${intermediateOutputPath}"`;
-    // await execPromise(concatenateCommand);
-
-    // // Rename the intermediate output to the final output
-    // await fs.rename(intermediateOutputPath, outputPath);
-
-    // 15. Upload the final video to Supabase
+    // 13. Upload the final video to Supabase
     const finalVideoBuffer = await fs.readFile(outputPath);
     const finalVideoName = `final_ad_${uuidv4()}.mp4`;
     const { error: uploadError } = await supabase.storage
@@ -215,20 +213,47 @@ export async function generateAd(voter: VoterRecord) {
     if (uploadError) {
         throw new Error(`Error uploading final video: ${uploadError.message}`);
     }
+    adEventEmitter.emit('status', 'Final video uploaded to Supabase');
 
     // 16. Get the public URL of the uploaded video
     const { data: { publicUrl } } = supabase.storage
         .from("video-files")
         .getPublicUrl(finalVideoName);
 
+
     if (!publicUrl) {
         throw new Error("Failed to get public URL for final video");
     }
 
-    // 17. Clean up temporary files
+    const { data: city_data } = await supabase
+        .from('cities')
+        .select('id')
+        .eq('town', voter.city ?? '')
+        .eq('state', voter.state ?? '')
+        .single();
+        
+    if (!city_data) {
+        throw new Error("City not found");
+    }
+
+    const { error: insertError } = await supabase
+        .from('video_map')
+        .insert({
+            video_url: publicUrl,
+            script: JSON.stringify(audio_response.wordTimings),
+            city_id: city_data.id
+        });
+
+    if (insertError) {
+       throw new Error("Error inserting video map:" + insertError.message);
+    }
+
+    // 15. Clean up temporary files
     await fs.rm(tempDir, { recursive: true, force: true });
     await fs.unlink(aiVideoTempPath);
 
+    // 16. Return the public URL of the final video
+    adEventEmitter.emit('status', 'Ad generation completed');
     // 18. Return the public URL of the final video
     return { finalVideoUrl: publicUrl };
 }

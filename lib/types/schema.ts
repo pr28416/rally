@@ -114,6 +114,53 @@ export type Database = {
         }
         Relationships: []
       }
+      clip_lengths: {
+        Row: {
+          clip_name: string
+          length: number
+        }
+        Insert: {
+          clip_name: string
+          length: number
+        }
+        Update: {
+          clip_name?: string
+          length?: number
+        }
+        Relationships: []
+      }
+      video_map: {
+        Row: {
+          city_id: string | null
+          created_at: string
+          id: string
+          script: Json | null
+          video_url: string
+        }
+        Insert: {
+          city_id?: string | null
+          created_at?: string
+          id?: string
+          script?: Json | null
+          video_url: string
+        }
+        Update: {
+          city_id?: string | null
+          created_at?: string
+          id?: string
+          script?: Json | null
+          video_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_map_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       voter_records: {
         Row: {
           age: number | null
