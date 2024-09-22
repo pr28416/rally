@@ -175,27 +175,54 @@ export async function generateAd(voter: VoterRecord) {
     const tempDir = await fs.mkdtemp(
         path.join(os.tmpdir(), "video-processing-"),
     );
-    let currentVideoPath = aiVideoTempPath;
+    const outputPath = path.join(tempDir, `final_output.mp4`);
+
+    const inputs = [
+        aiVideoTempPath,
+        ...croppedBRollVideos.map((bRoll) => bRoll!.outputPath),
+    ];
+    const filterComplexParts = [];
+    let overlayChains = "";
+    let lastOutput = "[0:v]";
 
     for (let i = 0; i < croppedBRollVideos.length; i++) {
         const bRoll = croppedBRollVideos[i];
-        if (bRoll) {
-            const outputPath = path.join(tempDir, `output_${i}.mp4`);
-            const ffmpegCommand = `ffmpeg -i "${currentVideoPath}" \
--i "${bRoll.outputPath}" \
--filter_complex "
-[1:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];
-[0:v][v1]overlay=x=(W-w)/2:y=(H-h)/2:enable='between(t,${bRoll.start},${bRoll.end})':eof_action=pass[outv]
-" -map "[outv]" -map 0:a -c:v libx264 -c:a aac "${outputPath}"`;
-            console.log(i, bRoll);
-            console.log(i, "ffmpegCommand", ffmpegCommand);
-            await execPromise(ffmpegCommand);
-            currentVideoPath = outputPath;
+        if (!bRoll) {
+            continue;
         }
+        const inputIndex = i + 1; // Since input 0 is the main video
+        const duration = bRoll.end - bRoll.start;
+        const startTime = bRoll.start;
+
+        // Prepare the B-roll filter
+        filterComplexParts.push(`
+            [${inputIndex}:v]trim=start=0:duration=${duration},setpts=PTS-STARTPTS+${startTime}/TB,scale=1920:1080,setsar=1[v${i}];
+        `);
+
+        // Overlay the B-roll onto the main video or previous overlay
+        const nextOutput = i === croppedBRollVideos.length - 1
+            ? "[outv]"
+            : `[tmp${i}]`;
+        overlayChains += `
+            ${lastOutput}[v${i}]overlay=enable='between(t,${startTime},${
+            startTime + duration
+        })':x=(W-w)/2:y=(H-h)/2${nextOutput === "[outv]" ? "" : nextOutput};
+        `;
+        lastOutput = nextOutput;
     }
 
+    const filterComplex = filterComplexParts.join("") + overlayChains;
+
+    const ffmpegCommand = `ffmpeg ${
+        inputs.map((input) => `-i "${input}"`).join(" ")
+    } -filter_complex "${filterComplex}" -map "[outv]" -map 0:a -c:v libx264 -c:a aac "${outputPath}"`;
+
+    // Execute the ffmpeg command
+    console.log("ffmpegCommand", ffmpegCommand);
+    await execPromise(ffmpegCommand);
+
     // 13. Upload the final video to Supabase
-    const finalVideoBuffer = await fs.readFile(currentVideoPath);
+    const finalVideoBuffer = await fs.readFile(outputPath);
     const finalVideoName = `final_ad_${uuidv4()}.mp4`;
     const { error: uploadError } = await supabase.storage
         .from("video-files")
