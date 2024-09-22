@@ -183,25 +183,6 @@ export async function generateAd(voter: VoterRecord) {
     // Execute the ffmpeg command for B-roll overlay
     console.log("ffmpegCommand", ffmpegCommand);
     await execPromise(ffmpegCommand);
-    // // 13. Create a 4-second video from the disclaimer image
-    // const disclaimerVideoPath = path.join(tempDir, `disclaimer.mp4`);
-    // const createDisclaimerCommand =
-    //     `ffmpeg -loop 1 -i "${disclaimerPath}" -c:v libx264 -t 4 -pix_fmt yuv420p -vf "scale=1920:1080,fade=in:st=0:d=1,fade=out:st=3:d=1" "${disclaimerVideoPath}"`;
-    // await execPromise(createDisclaimerCommand);
-
-    // // 14. Concatenate the main video with the disclaimer video
-    // const concatListPath = path.join(tempDir, "concat_list.txt");
-    // await fs.writeFile(
-    //     concatListPath,
-    //     `file '${outputPath}'\nfile '${disclaimerVideoPath}'`,
-    // );
-
-    // const concatenateCommand =
-    //     `ffmpeg -f concat -safe 0 -i "${concatListPath}" -c copy "${intermediateOutputPath}"`;
-    // await execPromise(concatenateCommand);
-
-    // // Rename the intermediate output to the final output
-    // await fs.rename(intermediateOutputPath, outputPath);
 
     // 15. Upload the final video to Supabase
     const finalVideoBuffer = await fs.readFile(outputPath);

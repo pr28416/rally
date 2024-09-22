@@ -73,9 +73,12 @@ Guidelines:
     const overallScriptUserPrompt = [
         `Voter background: ${
             JSON.stringify({
-                ...voter,
-                first_name: undefined,
-                last_name: undefined,
+                age: voter.age,
+                city: voter.city,
+                state: voter.state,
+                party_affiliation: voter.party_affiliation,
+                campaigns_donated_to: voter.campaigns_donated_to,
+                nonprofits_donated_to: voter.nonprofits_donated_to,
             })
         }`,
         `City information: ${JSON.stringify(cityData)}`,
@@ -126,13 +129,13 @@ Example structure:
 {
   "segments": [
     {
-      "spoken_transcript": "Friends, our nation faces challenges like never before.",
+      "spoken_transcript": "Friends, our nation faces challenges like never before. We see it in our communities every day",
       "is_b_roll": false
     },
     {
-      "spoken_transcript": "We see it in our communities every day",
+      "spoken_transcript": "Families struggling to make ends meet",
       "is_b_roll": true,
-      "b_roll_search_query": "diverse crowd, city street"
+      "b_roll_search_query": "families, financial stress, urban setting"
     },
     {
       "spoken_transcript": "But together, we can make a difference. We have the power to shape our future. It's time to stand united and work towards a better America. With your support, we can overcome any obstacle and build a country that truly represents all of us.",
@@ -202,7 +205,7 @@ Ensure the structured output maintains the original message and Kamala Harris's 
         mergedSegments[mergedSegments.length - 1].is_b_roll
     ) {
         mergedSegments[mergedSegments.length - 1].is_b_roll = false;
-        delete mergedSegments[mergedSegments.length - 1].b_roll_search_query;
+        mergedSegments[mergedSegments.length - 1].b_roll_search_query = "";
     }
 
     script.segments = mergedSegments;
