@@ -25,19 +25,19 @@ export default function Navbar({
   children: React.ReactNode
   onShuffleNext?: () => void
 }): React.ReactNode | null {
-  const [defaultCollapsed, setDefaultCollapsed] = useState<boolean | undefined>(undefined);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
 
   const handleCollapse = useCallback(() => {
-    setDefaultCollapsed((prev) => !prev);
-    localStorage.setItem("sidebar-collapsed", (!defaultCollapsed).toString());
-  }, [defaultCollapsed]);
+    setIsCollapsed((prev) => !prev);
+    localStorage.setItem("sidebar-collapsed", (!isCollapsed).toString());
+  }, [isCollapsed]);
 
   useEffect(() => {
     const collapsed = localStorage.getItem("sidebar-collapsed");
     const storedOpenMenus = localStorage.getItem("open-menus-real");
 
-    setDefaultCollapsed(collapsed ? JSON.parse(collapsed) : undefined);
+    setIsCollapsed(collapsed ? JSON.parse(collapsed) : false);
     setOpenMenus(storedOpenMenus ? JSON.parse(storedOpenMenus) : {});
   }, []);
 
@@ -68,13 +68,13 @@ export default function Navbar({
   return (
     <div className="bg-neutral-100 antialiased relative overflow-hidden">
       <SidebarWrapper
-        defaultCollapsed={defaultCollapsed}
+        defaultCollapsed={isCollapsed}
         openMenus={openMenus}
         onOpenMenusChange={handleOpenMenusChange}
         isLoading={false}
         navItems={navItems}
         onShuffleNext={onShuffleNext}
-        handleCollapse={handleCollapse} // Pass handleCollapse to SidebarWrapper
+        handleCollapse={handleCollapse}
       >
         <Header/>
 

@@ -1,5 +1,4 @@
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -7,10 +6,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Settings, Menu, X, Shield, UserCog } from "lucide-react"
+import { Menu, X } from "lucide-react"
+import { DocumentIcon } from "@heroicons/react/24/outline"
+import { FaDev, FaGithub } from "react-icons/fa"
 
 export function Header() {
-  const router = useRouter()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen)
@@ -30,30 +30,34 @@ export function Header() {
                            hover:shadow-md hover:scale-105 
                            active:scale-100 active:shadow-sm"
               >
-                <Settings className="h-6 w-6" />
-                <span className="font-medium">Settings</span>
+                <DocumentIcon className="h-6 w-6" />
+                <span className="font-medium">Materials</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64 p-2">
               <DropdownMenuItem 
-                onClick={() => router.push("/compliance")}
                 className="flex items-center p-3 space-x-3 hover:bg-blue-50 rounded-md transition-colors"
+                asChild
               >
-                <Shield className="h-5 w-5 text-blue-600" />
-                <div>
-                  <p className="font-medium">Compliance</p>
-                  <p className="text-sm text-gray-500">Manage compliance settings</p>
-                </div>
-              </DropdownMenuItem>
+                <a href="https://github.com/pr28416/rally" target="_blank" rel="noopener noreferrer">
+                  <FaGithub className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <p className="font-medium">Github</p>
+                    <p className="text-sm text-gray-500">View our repository!</p>
+                  </div>
+                </a>
+              </DropdownMenuItem> 
               <DropdownMenuItem 
-                onClick={() => router.push("/configuration")}
                 className="flex items-center p-3 space-x-3 hover:bg-blue-50 rounded-md transition-colors"
+                asChild
               >
-                <UserCog className="h-5 w-5 text-blue-600" />
-                <div>
-                  <p className="font-medium">Account Settings</p>
-                  <p className="text-sm text-gray-500">Manage your account</p>
-                </div>
+                <a href="https://devpost.com/software/rally-8sxi2t" target="_blank" rel="noopener noreferrer">
+                  <FaDev className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <p className="font-medium">Devpost</p>
+                    <p className="text-sm text-gray-500">Check out our Devpost page!</p>
+                  </div>
+                </a>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

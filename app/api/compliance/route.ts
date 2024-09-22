@@ -2,44 +2,34 @@ import billsData from '@/lib/json/bills.json';
 
 export async function POST(request: Request) {
   try {
-    const { query } = await request.json();
+    const { messages } = await request.json();
 
-    if (!query) {
-      return new Response(JSON.stringify({ error: 'Query is required' }), {
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return new Response(JSON.stringify({ error: 'Valid message history is required' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    const prompt = `You are an AI compliance expert for political advertising. Answer the following query about AI political ad compliance rules in a specific state:
+    const systemMessage = {
+      role: "system",
+      content: `You are an AI compliance expert for political advertising. Use the following information about state legislation to inform your answers:
+      ${JSON.stringify(billsData.states)}
+      
+      Provide clear and concise explanations, referencing specific bills when relevant. If no specific legislation exists for the state in question, mention that fact.`
+    };
 
-    ${query}
-    
-    Use the following information about state legislation to inform your answer:
-    ${JSON.stringify(billsData.states)}
-    
-    Provide a clear and concise explanation, referencing specific bills when relevant. If no specific legislation exists for the state in question, mention that fact.`;
-    
-    const messages = [
-      {
-        role: "system",
-        content: "You are an AI compliance expert for political advertising."
-      },
-      {
-        role: "user",
-        content: prompt
-      }
-    ];
+    const allMessages = [systemMessage, ...messages];
 
     const stream = await fetch("https://proxy.tune.app/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "sk-tune-Tuhx06Pc4oNHnQv4gapLlxhmEl0Z3oudjXw",
+        "Authorization": process.env.TUNE_API_KEY ?? '',
       },
       body: JSON.stringify({
         temperature: 0.7,
-        messages: messages,
+        messages: allMessages,
         model: "dineshtv/dineshtv-llama3-1",
         stream: true,
         frequency_penalty: 0.2,

@@ -2,8 +2,8 @@
     "sources": [
       {
         "thumbnail": "/images/thumbnail1.png",
-        "title": "Kamala Harris Youtube Clip",
-        "description": "A recent Youtube clip of Kamala Harris speaking in an interview, we used this to tune a model to her voice."
+        "title": "Kamala Harris Youtube Videos",
+        "description": "A collection of public Youtube videos of Kamala Harris speaking."
       },
       {
         "thumbnail": "/images/thumbnail2.png",

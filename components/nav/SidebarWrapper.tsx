@@ -25,12 +25,16 @@ export default function SidebarWrapper({
 }): ReactNode {
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed)
 
+  const toggleCollapse = () => {
+    setIsCollapsed(!isCollapsed)
+    handleCollapse()
+  }
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if ((event.metaKey || event.ctrlKey) && event.key === "e") {
         event.preventDefault()
-        setIsCollapsed(!isCollapsed)
-        handleCollapse()
+        toggleCollapse()
       }
       if (event.key === 'j' && (event.metaKey || event.ctrlKey)) {
         event.preventDefault()
@@ -59,7 +63,7 @@ export default function SidebarWrapper({
           items={navItems}
           isCollapsed={isCollapsed}
           isLoading={isLoading}
-          toggleCollapse={handleCollapse}
+          toggleCollapse={toggleCollapse}
           openMenus={openMenus}
           onOpenMenusChange={onOpenMenusChange}
         />

@@ -27,14 +27,17 @@ import React from "react"
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
+  onSearch: (term: string) => void
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
+  onSearch,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+  const [searchTerm, setSearchTerm] = React.useState("")
 
   const table = useReactTable({
     data,
@@ -51,19 +54,23 @@ export function DataTable<TData, TValue>({
     },
   })
 
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newTerm = event.target.value
+    setSearchTerm(newTerm)
+    onSearch(newTerm)
+  }
+
   return (
-    <div>
-      <div className="flex items-center py-4">
+    <div className="relative">
+      <div className="sticky top-0 z-10 bg-white py-4 px-2 w-full">
         <Input
           placeholder="Search by keywords..."
-          value={(table.getColumn("content")?.getFilterValue() as string) ?? ""}
-          onChange={(event) =>
-            table.getColumn("content")?.setFilterValue(event.target.value)
-          }
-          className="max-w-sm"
+          value={searchTerm}
+          onChange={handleSearchChange}
+          className="max-w-sm bg-white w-full"
         />
       </div>
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-auto max-h-[calc(100vh-200px)]">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
