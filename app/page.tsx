@@ -13,15 +13,17 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { columns } from "@/app/components/columns"
 import { DataTable } from "@/app/components/data-table"
+import { FaVoteYea, FaUserTie, FaLandmark, FaExclamationTriangle, FaDemocrat, FaRepublican } from "react-icons/fa";
 import { IconType } from "react-icons";
-import { FaUsers, FaVoteYea, FaChartLine, FaExclamationTriangle, FaDollarSign, FaBabyCarriage, FaUserTie, FaLandmark, FaIndustry } from "react-icons/fa";
+import { FaUsers, FaChartLine, FaDollarSign, FaBabyCarriage, FaIndustry } from "react-icons/fa";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Command } from "lucide-react";
 import sourcesData from "@/lib/json/sources.json";
 const ReactPlayer = dynamic(() => import('react-player'), { ssr: false });
 import Image from "next/image";
 import { useCardStack } from "@/app/components/CardStack";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 const AnimatedHeader = ({ title, subtitle }: { title: string; subtitle?: string }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -57,6 +59,19 @@ const AnimatedHeader = ({ title, subtitle }: { title: string; subtitle?: string 
   );
 };
 
+type Party = 'Democrat' | 'Republican' | 'Independent';
+
+const partyIcons: Record<Party, IconType> = {
+  Democrat: FaDemocrat,
+  Republican: FaRepublican,
+  Independent: FaLandmark,
+};
+
+const PartyIcon = ({ party, className }: { party: Party; className?: string }) => {
+  const Icon = partyIcons[party] || FaUsers;
+  return <Icon className={className} />;
+};
+
 export default function Home() {
   const [cityData, setCityData] = useState<Database['public']['Tables']['cities']['Row'] | null>(null);
   const [voters, setVoters] = useState<Database['public']['Tables']['voter_records']['Row'][]>([]);
@@ -75,10 +90,18 @@ export default function Home() {
   const [cardItems, setCardItems] = useState<Array<{ id: number; name: string; designation: string; icon: IconType; content: React.ReactNode }>>([]);
   const { cards, setCards, shuffleToNext } = useCardStack();
 
+  const [dialogContent, setDialogContent] = useState<React.ReactNode | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
   const handleShuffleNext = useCallback(() => {
     console.log("Shuffling to next card");
     shuffleToNext();
   }, [shuffleToNext]);
+
+  const handleCommandClick = (content: React.ReactNode) => {
+    setDialogContent(content);
+    setIsDialogOpen(true);
+  };
 
   useEffect(() => {
     setIsClient(true);
@@ -95,6 +118,12 @@ export default function Home() {
       }
 
       setVoters(data || []);
+
+      // Select a random voter
+      if (data && data.length > 0) {
+        const randomVoter = data[Math.floor(Math.random() * data.length)];
+        setSelectedVoter(randomVoter.id);
+      }
     };
 
     fetchVoters();
@@ -109,22 +138,36 @@ export default function Home() {
 
       setIsLoading(true);
       const supabase = createClientComponentClient<Database>();
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('cities')
         .select('*')
         .eq('town', voter.city || '')
         .eq('state', voter.state || '')
         .single();
 
-      if (error) {
-        console.error('Error fetching city data:', error);
-        setIsLoading(false);
-        return;
+      if (error || !data) {
+        // If city data is not found, try to fetch state data
+        const { data: stateData, error: stateError } = await supabase
+          .from('cities')
+          .select('*')
+          .is('town', null)
+          .eq('state', voter.state || '')
+          .single();
+
+        if (stateError) {
+          console.error('Error fetching state data:', stateError);
+          setIsLoading(false);
+          return;
+        }
+
+        data = stateData;
+      } else {
+        error = null;
       }
 
-      setCityData(data);
-
       if (data) {
+        setCityData(data);
+
         const { queryLocation } = getQueryLocation(data.town || '', data.state);
         setHeaderText(queryLocation);
 
@@ -155,9 +198,11 @@ export default function Home() {
                 <ContentItem icon={FaVoteYea} title="Political Leaning" content={
                   <span>{data.party_leanings || 'N/A'}</span>
                 } />
-                <ContentItem icon={FaUserTie} title="Current Mayor" content={
-                  <span>{data.mayor || 'N/A'}</span>
-                } />
+                {data.town && (
+                  <ContentItem icon={FaUserTie} title="Current Mayor" content={
+                    <span>{data.mayor || 'N/A'}</span>
+                  } />
+                )}
                 <ContentItem icon={FaLandmark} title="State Governor" content={
                   <span>{data.state_governor || 'N/A'}</span>
                 } />
@@ -260,148 +305,315 @@ export default function Home() {
 
   const { sources } = sourcesData;
 
+  const truncateText = (text: string, length: number) => {
+    if (text.length <= length) return text;
+    return text.substring(0, length) + '...';
+  };
+
   return (
     <Navbar onShuffleNext={handleShuffleNext}>
-      <main className="min-h-screen px-8 pt-4">
-        <div className="mb-6">
-          <Select onValueChange={(value) => setSelectedVoter(value)}>
-            <SelectTrigger className="w-[300px]">
-              <SelectValue placeholder="Select a voter" />
+      <main className="min-h-screen px-4 sm:px-8 pt-4 relative">
+        <div className="mb-6 flex flex-col sm:flex-row items-center justify-between">
+          <Select value={selectedVoter || ''} onValueChange={(value) => setSelectedVoter(value)}>
+            <SelectTrigger className="py-3 px-4 w-full sm:w-[350px] bg-white shadow-sm hover:bg-gray-50 transition-colors min-h-[50px] flex items-center">
+              <SelectValue placeholder="Choose a voter to analyze">
+                {selectedVoter && voters.length > 0 && (
+                  <span>
+                    {voters.find(voter => voter.id === selectedVoter)?.first_name} {voters.find(voter => voter.id === selectedVoter)?.last_name}
+                  </span>
+                )}
+              </SelectValue>
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-[300px] overflow-y-auto">
               {voters.map((voter) => (
-                <SelectItem key={voter.id} value={voter.id}>
-                  {`${voter.first_name} ${voter.last_name} - ${voter.city}, ${voter.state}`}
+                <SelectItem 
+                  key={voter.id} 
+                  value={voter.id}
+                  className="py-2 px-4 hover:bg-blue-50 cursor-pointer transition-colors"
+                >
+                  <div className="flex flex-col py-1 text-left">
+                    <span className="font-medium">{`${voter.first_name} ${voter.last_name}`}</span>
+                    <span className="text-sm text-gray-500">{`${voter.city}, ${voter.state}`}</span>
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          {/* Add the label to the right */}
+          <span className="justify-end flex items-center text-gray-500 text-sm mt-2 sm:mt-0">
+            <Command className="w-4 h-4 mr-1" />
+            Cmd + Click to Focus Section
+          </span>
         </div>
         
         <div className="flex flex-col lg:flex-row gap-8 items-start justify-center">
           <div className="w-full lg:w-2/5">
-            <AnimatedHeader title="Voter Profile" subtitle="Personal and political insights" />
-            <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm blue-shadow">
-              <CardContent className="p-6">
-                <Skeleton isLoading={isLoading} className="h-8 w-3/4 mb-4" />
-                <Skeleton isLoading={isLoading} className="h-6 w-1/2 mb-4" />
-                <Skeleton isLoading={isLoading} className="h-20 w-full mb-4" />
-                <Skeleton isLoading={isLoading} className="h-10 w-1/3" />
-                {!isLoading && voterData && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.5 }}
-                    className="space-y-6"
-                  >
-                    <h2 className="text-2xl font-bold text-blue-600">{voterData.first_name} {voterData.last_name}</h2>
-                    
+            <div onClick={(e) => e.metaKey && handleCommandClick(
+              <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm blue-shadow">
+                <CardContent className="p-6">
+                  <Skeleton isLoading={isLoading} className="h-8 w-3/4 mb-4" />
+                  <Skeleton isLoading={isLoading} className="h-6 w-1/2 mb-4" />
+                  <Skeleton isLoading={isLoading} className="h-20 w-full mb-4" />
+                  <Skeleton isLoading={isLoading} className="h-10 w-1/3" />
+                  {!isLoading && voterData && (
                     <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2 }}
-                      className="bg-gray-50 p-4 rounded-lg shadow-sm"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.5 }}
+                      className="space-y-6"
                     >
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <p className="text-sm text-gray-500">Age</p>
-                          <p className="font-medium">{voterData.age || 'N/A'}</p>
+                      <h2 className="text-2xl font-semibold text-blue-600">{voterData.first_name} {voterData.last_name}</h2>
+                      
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="flex flex-col sm:flex-row justify-between space-y-4 sm:space-y-0 sm:space-x-4"
+                      >
+                        <div className="bg-gray-50 p-4 rounded-lg shadow-sm transition-all hover:shadow-md flex-1">
+                          <div className="text-center">
+                            <p className="text-sm text-gray-500">Age</p>
+                            <p className="font-medium">{voterData.age || 'N/A'}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Location</p>
-                          <p className="font-medium">{`${voterData.city}, ${voterData.state}`}</p>
+                        <div className="bg-gray-100 p-4 rounded-lg shadow-sm transition-all hover:shadow-md flex-1">
+                          <div className="text-center">
+                            <p className="text-sm text-gray-500">Location</p>
+                            <p className="font-medium">{`${voterData.city}, ${voterData.state}`}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Party Affiliation</p>
-                          <p className="font-medium">{voterData.party_affiliation || 'N/A'}</p>
+                        <div className="bg-gray-200 p-4 rounded-lg shadow-sm transition-all hover:shadow-md flex-1">
+                          <div className="text-center">
+                            <p className="text-sm text-gray-500">Party Affiliation</p>
+                            <div className="flex items-center justify-center">
+                              {voterData.party_affiliation && (
+                                <PartyIcon party={voterData.party_affiliation as Party} className="w-5 h-5 mr-2" />
+                              )}
+                              <p className="font-medium">{voterData.party_affiliation || 'N/A'}</p>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </motion.div>
+                      </motion.div>
 
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 }}
+                        className="space-y-4"
+                      >
+                        <div>
+                          <h3 className="text-md text-gray-500 font-normal mb-2">Donations</h3>
+                          <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-4 w-full">
+                            <div className="flex-1 w-full">
+                              <DonationList items={voterData.campaigns_donated_to} type="campaign" />
+                              <DonationList items={voterData.nonprofits_donated_to} type="nonprofit" />
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </CardContent>
+              </Card>
+            )}>
+              <AnimatedHeader title="Voter Profile" subtitle="Personal and political insights" />
+              <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm blue-shadow">
+                <CardContent className="p-6">
+                  <Skeleton isLoading={isLoading} className="h-8 w-3/4 mb-4" />
+                  <Skeleton isLoading={isLoading} className="h-6 w-1/2 mb-4" />
+                  <Skeleton isLoading={isLoading} className="h-20 w-full mb-4" />
+                  <Skeleton isLoading={isLoading} className="h-10 w-1/3" />
+                  {!isLoading && voterData && (
                     <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.4 }}
-                      className="space-y-4"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.5 }}
+                      className="space-y-6"
                     >
-                      <div>
-                        <h3 className="text-md text-gray-500 font-normal mb-2">Donations</h3>
-                        <div className="space-y-2">
-                          <DonationList items={voterData.campaigns_donated_to} type="campaign" />
-                          <DonationList items={voterData.nonprofits_donated_to} type="nonprofit" />
+                      <h2 className="text-2xl font-semibold text-blue-600">{voterData.first_name} {voterData.last_name}</h2>
+                      
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="flex flex-col sm:flex-row justify-between space-y-4 sm:space-y-0 sm:space-x-4"
+                      >
+                        <div className="bg-gray-50 p-4 rounded-lg shadow-sm transition-all hover:shadow-md flex-1">
+                          <div className="text-center">
+                            <p className="text-sm text-gray-500">Age</p>
+                            <p className="font-medium">{voterData.age || 'N/A'}</p>
+                          </div>
                         </div>
-                      </div>
-                    </motion.div>
-                  </motion.div>
-                )}
-              </CardContent>
-            </Card>
+                        <div className="bg-gray-100 p-4 rounded-lg shadow-sm transition-all hover:shadow-md flex-1">
+                          <div className="text-center">
+                            <p className="text-sm text-gray-500">Location</p>
+                            <p className="font-medium">{`${voterData.city}, ${voterData.state}`}</p>
+                          </div>
+                        </div>
+                        <div className="bg-gray-200 p-4 rounded-lg shadow-sm transition-all hover:shadow-md flex-1">
+                          <div className="text-center">
+                            <p className="text-sm text-gray-500">Party Affiliation</p>
+                            <div className="flex items-center justify-center">
+                              {voterData.party_affiliation && (
+                                <PartyIcon party={voterData.party_affiliation as Party} className="w-5 h-5 mr-2" />
+                              )}
+                              <p className="font-medium">{voterData.party_affiliation || 'N/A'}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
 
-            <AnimatedHeader title="Location Profile" subtitle="Demographic and political insights" />
-            <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm blue-shadow">
-              <CardContent className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <Skeleton isLoading={isLoading} className="h-8 w-2/3">
-                    <motion.h1 
-                      className="text-2xl font-normal text-blue-600"
-                      initial={{ y: -20 }}
-                      animate={{ y: 0 }}
-                      transition={{ type: "spring", stiffness: 300 }}
-                    >
-                      {headerText}
-                    </motion.h1>
-                  </Skeleton>
-                  <div className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full flex items-center">
-                    <span className="mr-1">⌘ J</span>
-                    <span>Next Block</span>
-                  </div>
-                </div>
-                <Skeleton isLoading={isLoading} className="h-[400px]">
-                  <CardStack 
-                    items={cardItems} 
-                    offset={5} 
-                    scaleFactor={0.03} 
-                    cards={cards} 
-                    setCards={setCards} 
-                  />               
-               </Skeleton>
-              </CardContent>
-            </Card>
-            
-            <AnimatedHeader title="Legislation Profile" subtitle="AI Political Ads" />
-            <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm blue-shadow">
-              <CardContent className="p-6">
-                <Skeleton isLoading={isLoading} className="h-8 w-3/4 mb-4" />
-                <Skeleton isLoading={isLoading} className="h-6 w-1/2 mb-4" />
-                <Skeleton isLoading={isLoading} className="h-20 w-full mb-4" />
-                <Skeleton isLoading={isLoading} className="h-10 w-1/3" />
-                {!isLoading && stateBillInfo && (
-                  <>
-                    <h2 className="text-2xl font-bold text-blue-600 mb-4">State of {cityData?.state || 'Unknown State'}</h2>
-                    <div className="flex items-center space-x-4 mb-4">
-                      <div className={`text-sm font-medium px-3 py-1 rounded-full ${
-                        stateBillInfo.status === "ENACTED" ? "bg-green-100 text-green-800" :
-                        stateBillInfo.status === "PENDING" ? "bg-yellow-100 text-yellow-800" :
-                        "bg-red-100 text-red-800"
-                      }`}>
-                        {stateBillInfo.status}
-                      </div>
-                      <span className="text-gray-600">in {cityData?.state || 'Unknown State'}</span>
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 }}
+                        className="space-y-4"
+                      >
+                        <div>
+                          <h3 className="text-md text-gray-500 font-normal mb-2">Donations</h3>
+                          <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-4">
+                            <div className="flex-1">
+                              <DonationList items={voterData.campaigns_donated_to} type="campaign" />
+                              <DonationList items={voterData.nonprofits_donated_to} type="nonprofit" />
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div onClick={(e) => e.metaKey && handleCommandClick(
+              <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm blue-shadow">
+                <CardContent className="p-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <Skeleton isLoading={isLoading} className="h-8 w-2/3">
+                      <motion.h1 
+                        className="text-2xl font-normal text-blue-600"
+                        initial={{ y: -20 }}
+                        animate={{ y: 0 }}
+                        transition={{ type: "spring", stiffness: 300 }}
+                      >
+                        {headerText}
+                      </motion.h1>
+                    </Skeleton>
+                    <div className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full flex items-center">
+                      <span className="mr-1">⌘ J</span>
+                      <span>to Flip Through</span>
                     </div>
-                    <p className="text-gray-700 mb-4">{stateBillInfo.analysis}</p>
-                    <Button onClick={() => {
-                      window.open('https://www.ncsl.org/technology-and-communication/deceptive-audio-or-visual-media-deepfakes-2024-legislation', '_blank');
-                    }} variant="outline" className="text-blue-600 border-blue-600 hover:bg-blue-50">
-                      Learn More
-                    </Button>
-                  </>
-                )}
-              </CardContent>
-            </Card>
+                  </div>
+                  <Skeleton isLoading={isLoading} className="h-[400px]">
+                    <CardStack 
+                      items={cardItems} 
+                      offset={5} 
+                      scaleFactor={0.03} 
+                      cards={cards} 
+                      setCards={setCards} 
+                    />               
+                  </Skeleton>
+                </CardContent>
+              </Card>
+            )}>
+              <AnimatedHeader title="Location Profile" subtitle="Demographic and political insights" />
+              <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm blue-shadow">
+                <CardContent className="p-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <Skeleton isLoading={isLoading} className="h-8 w-2/3">
+                      <motion.h1 
+                        className="text-2xl font-normal text-blue-600"
+                        initial={{ y: -20 }}
+                        animate={{ y: 0 }}
+                        transition={{ type: "spring", stiffness: 300 }}
+                      >
+                        {headerText}
+                      </motion.h1>
+                    </Skeleton>
+                    <div className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full flex items-center">
+                      <span className="mr-1">⌘ J</span>
+                      <span>to Flip Through</span>
+                    </div>
+                  </div>
+                  <Skeleton isLoading={isLoading} className="h-[400px]">
+                    <CardStack 
+                      items={cardItems} 
+                      offset={5} 
+                      scaleFactor={0.03} 
+                      cards={cards} 
+                      setCards={setCards} 
+                    />               
+                  </Skeleton>
+                </CardContent>
+              </Card>
+            </div>
+            
+            <div onClick={(e) => e.metaKey && handleCommandClick(
+              <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm blue-shadow">
+                <CardContent className="p-6">
+                  <Skeleton isLoading={isLoading} className="h-8 w-3/4 mb-4" />
+                  <Skeleton isLoading={isLoading} className="h-6 w-1/2 mb-4" />
+                  <Skeleton isLoading={isLoading} className="h-20 w-full mb-4" />
+                  <Skeleton isLoading={isLoading} className="h-10 w-1/3" />
+                  {!isLoading && stateBillInfo && (
+                    <>
+                      <h2 className="text-2xl font-normal text-blue-600 mb-4">State of {cityData?.state || 'Unknown State'}</h2>
+                      <div className="flex items-center space-x-4 mb-4">
+                        <div className={`text-sm font-medium px-3 py-1 rounded-full ${
+                          stateBillInfo.status === "ENACTED" ? "bg-green-100 text-green-800" :
+                          stateBillInfo.status === "PENDING" ? "bg-yellow-100 text-yellow-800" :
+                          "bg-red-100 text-red-800"
+                        }`}>
+                          {stateBillInfo.status}
+                        </div>
+                        <span className="text-gray-600">in {cityData?.state || 'Unknown State'}</span>
+                      </div>
+                      <p className="text-gray-700 mb-4">{stateBillInfo.analysis}</p>
+                      <Button onClick={() => {
+                        window.open('https://www.ncsl.org/technology-and-communication/deceptive-audio-or-visual-media-deepfakes-2024-legislation', '_blank');
+                      }} variant="outline" className="text-blue-600 border-blue-600 hover:bg-blue-50">
+                        Learn More
+                      </Button>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}>
+              <AnimatedHeader title="Legislation Profile" subtitle="AI Political Ads" />
+              <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm blue-shadow">
+                <CardContent className="p-6">
+                  <Skeleton isLoading={isLoading} className="h-8 w-3/4 mb-4" />
+                  <Skeleton isLoading={isLoading} className="h-6 w-1/2 mb-4" />
+                  <Skeleton isLoading={isLoading} className="h-20 w-full mb-4" />
+                  <Skeleton isLoading={isLoading} className="h-10 w-1/3" />
+                  {!isLoading && stateBillInfo && (
+                    <>
+                      <h2 className="text-2xl font-normal text-blue-600 mb-4">State of {cityData?.state || 'Unknown State'}</h2>
+                      <div className="flex items-center space-x-4 mb-4">
+                        <div className={`text-sm font-medium px-3 py-1 rounded-full ${
+                          stateBillInfo.status === "ENACTED" ? "bg-green-100 text-green-800" :
+                          stateBillInfo.status === "PENDING" ? "bg-yellow-100 text-yellow-800" :
+                          "bg-red-100 text-red-800"
+                        }`}>
+                          {stateBillInfo.status}
+                        </div>
+                        <span className="text-gray-600">in {cityData?.state || 'Unknown State'}</span>
+                      </div>
+                      <p className="text-gray-700 mb-4">{stateBillInfo.analysis}</p>
+                      <Button onClick={() => {
+                        window.open('https://www.ncsl.org/technology-and-communication/deceptive-audio-or-visual-media-deepfakes-2024-legislation', '_blank');
+                      }} variant="outline" className="text-blue-600 border-blue-600 hover:bg-blue-50">
+                        Learn More
+                      </Button>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
           
-          <div className="w-full lg:w-3/5">
-            <div className="flex items-center mb-2 space-x-2 ">
+          <div className="w-full">
+            <div className="flex items-center mb-2 space-x-2">
               <AnimatedHeader title="Advertisement" subtitle="AI-powered content" />
               <Button
                 onClick={handleGenerateVideo}
@@ -413,7 +625,7 @@ export default function Home() {
                 {isGenerating ? 'Generating...' : 'Generate Video'}
               </Button>
             </div>
-            <Skeleton isLoading={isLoading} className="aspect-video">
+            <div onClick={(e) => e.metaKey && handleCommandClick(
               <Card className="shadow-sm border-0 overflow-hidden bg-white blue-shadow">
                 <CardContent className="p-0">
                   <div className="aspect-video bg-gray-200 relative">
@@ -431,56 +643,129 @@ export default function Home() {
                   </div>
                 </CardContent>
               </Card>
-            </Skeleton>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-            {/* Existing Video Script section */}
-            <div>
-              <AnimatedHeader title="Video Script" subtitle="Timestamped content" />
-              <Card className="shadow-sm border-0 bg-white blue-shadow">
-                <CardContent className="p-6">
-                  <Skeleton isLoading={isLoading} className="h-[400px]">
-                    <DataTable columns={columns} data={timestamps} />
-                  </Skeleton>
-                </CardContent>
-              </Card>
-            </div>
-            <div>
-              <AnimatedHeader title="Sources" subtitle="Information references" />
-              <Card className="shadow-sm border-0 bg-white blue-shadow">
-                <CardContent className="p-6">
-                  <Skeleton isLoading={isLoading} className="h-[400px]">
-                    <div className="space-y-4">
-                      {sources.map((source, index) => (
-                        <div key={index} className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg transition-all hover:shadow-md">
-                          <div className="flex-shrink-0">
-                            <Image
-                              src={source.thumbnail}
-                              alt={source.title}
-                              width={80}
-                              height={60}
-                              className="rounded-md object-cover"
-                            />
-                          </div>
-                          <div className="flex-grow">
-                            <h4 className="text-sm font-semibold text-gray-800">{source.title}</h4>
-                            <p className="text-xs text-gray-600">{source.description}</p>
-                          </div>
-                        </div>
-                      ))}
+            )}>
+              <Skeleton isLoading={isLoading} className="aspect-video">
+                <Card className="shadow-sm border-0 overflow-hidden bg-white blue-shadow">
+                  <CardContent className="p-0">
+                    <div className="aspect-video bg-gray-200 relative">
+                      {isClient && (
+                        <ReactPlayer
+                          url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                          width="100%"
+                          height="100%"
+                          playing={isPlaying}
+                          controls={true}
+                          onPlay={() => setIsPlaying(true)}
+                          onPause={() => setIsPlaying(false)}
+                        />
+                      )}
                     </div>
-                  </Skeleton>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </Skeleton>
             </div>
+
+            <div className="flex flex-col lg:flex-row gap-6 mt-6">
+              <div className="w-full">
+                <div onClick={(e) => e.metaKey && handleCommandClick(
+                  <Card className="shadow-sm border-0 bg-white blue-shadow h-full">
+                    <CardContent className="p-6">
+                      <Skeleton isLoading={isLoading} className="h-[400px]">
+                        <DataTable columns={columns} data={timestamps} />
+                      </Skeleton>
+                    </CardContent>
+                  </Card>
+                )}>
+                  <AnimatedHeader title="Video Script" subtitle="Timestamped content" />
+                  <Card className="shadow-sm border-0 bg-white blue-shadow h-full">
+                    <CardContent className="p-6">
+                      <Skeleton isLoading={isLoading} className="h-[400px]">
+                        <DataTable columns={columns} data={timestamps} />
+                      </Skeleton>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </div>
+
+            <div className="w-full mt-6">
+              <div onClick={(e) => e.metaKey && handleCommandClick(
+                <Card className="shadow-sm border-0 bg-white blue-shadow h-full">
+                  <CardContent className="p-6">
+                    <Skeleton isLoading={isLoading} className="h-[400px]">
+                      <div className="space-y-4 overflow-y-auto max-h-[400px]">
+                        {sources.map((source, index) => (
+                          <div key={index} className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 p-3 bg-gray-50 rounded-lg transition-all hover:shadow-md">
+                            <div className="flex-shrink-0">
+                              <Image
+                                src={source.thumbnail}
+                                alt={source.title}
+                                width={80}
+                                height={60}
+                                className="rounded-md object-cover"
+                              />
+                            </div>
+                            <div className="flex-grow text-center sm:text-left">
+                              <h4 className="text-sm font-semibold text-gray-800">{source.title}</h4>
+                              <p className="text-xs text-gray-600">
+                                {truncateText(source.description, 30)}
+                                {source.description.length > 30 && (
+                                  <span className="text-blue-500 cursor-pointer"> show more</span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </Skeleton>
+                  </CardContent>
+                </Card>
+              )}>
+                <AnimatedHeader title="Sources" subtitle="Information references" />
+                <Card className="shadow-sm border-0 bg-white blue-shadow h-full">
+  <CardContent className="p-6">
+    <Skeleton isLoading={isLoading} className="h-[400px]">
+      <div className="overflow-x-auto">
+        <div className="flex space-x-4 pb-4">
+          {sources.map((source, index) => (
+            <div key={index} className="flex-shrink-0 w-64 bg-gray-50 rounded-lg transition-all hover:shadow-md">
+              <div className="p-3">
+                <Image
+                  src={source.thumbnail}
+                  alt={source.title}
+                  width={80}
+                  height={60}
+                  className="rounded-md object-cover w-full h-40 mb-3"
+                />
+                <h4 className="text-sm font-semibold text-gray-800 mb-1">{source.title}</h4>
+                <p className="text-xs text-gray-600">
+                  {truncateText(source.description, 50)}
+                  {source.description.length > 50 && (
+                    <span className="text-blue-500 cursor-pointer ml-1">show more</span>
+                  )}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Skeleton>
+  </CardContent>
+</Card>
+              </div>
             </div>
           </div>
         </div>
       </main>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="bg-white">
+          {dialogContent}
+        </DialogContent>
+      </Dialog>
     </Navbar>
   );
 }
-
 const ContentItem = ({ title, content, icon: Icon }: { title: string; content: React.ReactNode; icon?: IconType }) => (
   <div className="mb-4 p-4 bg-gray-50 rounded-lg shadow-sm transition-all hover:shadow-md">
     <div className="flex items-center mb-2">
@@ -492,15 +777,17 @@ const ContentItem = ({ title, content, icon: Icon }: { title: string; content: R
 );
 
 const DonationList = ({ items, type }: { items: string[] | null; type: 'campaign' | 'nonprofit' }) => (
-  <div className="mt-2">
+  <div className="mt-2 w-full">
     {items && items.length > 0 ? (
-      <ul className="space-y-2">
+      <ul className="space-y-2 w-full">
         {items.map((item, index) => (
-          <li key={index} className="flex items-center">
-            <Badge variant="outline" className={`mr-2 ${type === 'campaign' ? 'bg-blue-100' : 'bg-green-100'}`}>
+          <li key={index} className="flex items-center w-full">
+            <Badge variant="outline" className={`w-20 mr-2 flex-shrink-0 ${type === 'campaign' ? 'bg-blue-100' : 'bg-green-100'}`}>
               {type === 'campaign' ? 'Campaign' : 'Nonprofit'}
             </Badge>
-            <span className="text-sm">{item}</span>
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <span className="text-sm block truncate">{item}</span>
+            </div>
           </li>
         ))}
       </ul>

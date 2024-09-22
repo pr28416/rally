@@ -83,11 +83,12 @@ export const CardStack = ({
                 transformOrigin: "top center",
                 height: `${maxHeight}px`,
                 overflow: 'hidden',
+                zIndex: cards.length - index,
               }}
+              initial={false}
               animate={{
                 top: index * CARD_OFFSET,
                 scale: 1 - index * SCALE_FACTOR,
-                zIndex: cards.length - index,
                 rotate: index * ROTATION_FACTOR,
                 x: index * X_OFFSET_FACTOR,
               }}

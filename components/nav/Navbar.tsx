@@ -3,13 +3,13 @@ import SidebarWrapper from "./SidebarWrapper"
 import { type NavItemType } from "./Sidebar"
 import { LayoutDashboard, TextSelect } from "lucide-react"
 import { Header } from "./Header"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 
 const navItems: NavItemType[] = [
   {
     icon: <TextSelect className="w-6 h-6 text-blue-500" />,
     label: "Generate",
-    href: "/generate",
+    href: "/",
   },
   {
     icon: <LayoutDashboard className="w-6 h-6 text-blue-500" />,
@@ -28,6 +28,11 @@ export default function Navbar({
   const [defaultCollapsed, setDefaultCollapsed] = useState<boolean | undefined>(undefined);
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
 
+  const handleCollapse = useCallback(() => {
+    setDefaultCollapsed((prev) => !prev);
+    localStorage.setItem("sidebar-collapsed", (!defaultCollapsed).toString());
+  }, [defaultCollapsed]);
+
   useEffect(() => {
     const collapsed = localStorage.getItem("sidebar-collapsed");
     const storedOpenMenus = localStorage.getItem("open-menus-real");
@@ -35,6 +40,25 @@ export default function Navbar({
     setDefaultCollapsed(collapsed ? JSON.parse(collapsed) : undefined);
     setOpenMenus(storedOpenMenus ? JSON.parse(storedOpenMenus) : {});
   }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "e") {
+        event.preventDefault()
+        handleCollapse()
+      }
+      if (event.key === 'j' && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault()
+        onShuffleNext?.()
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [handleCollapse, onShuffleNext])
 
   const handleOpenMenusChange = (newOpenMenus: Record<string, boolean>) => {
     setOpenMenus(newOpenMenus);
@@ -50,6 +74,7 @@ export default function Navbar({
         isLoading={false}
         navItems={navItems}
         onShuffleNext={onShuffleNext}
+        handleCollapse={handleCollapse} // Pass handleCollapse to SidebarWrapper
       >
         <Header/>
 

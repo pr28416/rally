@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils"
 import { useRouter, usePathname } from "next/navigation"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
-import { CommandIcon, MessageSquareDot, XIcon } from "lucide-react"
+import { AlignHorizontalJustifyStart, CommandIcon, XIcon } from "lucide-react"
 import { type ReactNode } from "react"
 import { z } from "zod"
 import {
@@ -88,7 +88,7 @@ export function Sidebar({
           )}
         >
             <div className={cn("flex items-center cursor-pointer", !isCollapsed ? "ml-3" : "")} onClick={() => router.push("/")}>
-                <MessageSquareDot className="w-6 h-6 text-blue-500 font-light" />
+                <AlignHorizontalJustifyStart className="w-6 h-6 text-blue-500 font-light" />
                 {!isCollapsed && <h2 className="ml-2 mb-1 text-2xl font-light text-blue-500">rally</h2>}
         </div>
         </div>

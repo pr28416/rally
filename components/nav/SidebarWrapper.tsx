@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils"
-import { type ReactNode, useCallback, useEffect, useState } from "react"
+import { type ReactNode, useEffect, useState } from "react"
 import { type NavItemType, Sidebar } from "./Sidebar"
 
 export default function SidebarWrapper({
@@ -11,6 +11,7 @@ export default function SidebarWrapper({
   navItems,
   isDevTools = false,
   onShuffleNext,
+  handleCollapse, 
 }: {
   children: ReactNode
   defaultCollapsed?: boolean
@@ -20,18 +21,15 @@ export default function SidebarWrapper({
   navItems: NavItemType[]
   isDevTools?: boolean
   onShuffleNext?: () => void
+  handleCollapse: () => void 
 }): ReactNode {
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed)
-
-  const handleCollapse = useCallback(() => {
-    setIsCollapsed((prev) => !prev)
-    localStorage.setItem("sidebar-collapsed", (!isCollapsed).toString())
-  }, [isCollapsed])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if ((event.metaKey || event.ctrlKey) && event.key === "e") {
         event.preventDefault()
+        setIsCollapsed(!isCollapsed)
         handleCollapse()
       }
       if (event.key === 'j' && (event.metaKey || event.ctrlKey)) {
