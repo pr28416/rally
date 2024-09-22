@@ -101,7 +101,6 @@ const Home = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [voterData, setVoterData] = useState<Database['public']['Tables']['voter_records']['Row'] | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedAdUrl, setGeneratedAdUrl] = useState<string | null>(null);
 
   const [cardItems, setCardItems] = useState<Array<{ id: number; name: string; designation: string; icon: IconType; content: React.ReactNode }>>([]);
   const { cards, setCards, shuffleToNext } = useCardStack();
@@ -115,7 +114,7 @@ const Home = () => {
   const router = useRouter();
 
   const [currentTime, setCurrentTime] = useState(0);
-  const [searchTerm, setSearchTerm] = useState('');
+  // const [searchTerm, setSearchTerm] = useState('');
   const playerRef = useRef<typeof ReactPlayer>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
@@ -177,19 +176,20 @@ const Home = () => {
     scrollToCurrentSegment();
   }, [currentTime, scrollToCurrentSegment]);
 
+  
   const handleSearch = (term: string) => {
     if (!term.trim()) return;
-
+  
     const foundIndex = scriptData.findIndex(segment => 
       segment.content.toLowerCase().includes(term.toLowerCase())
     );
-
+  
     if (foundIndex !== -1 && tableRef.current && playerRef.current) {
-      const rowHeight = 48; // Adjust this value based on your actual row height
+      const rowHeight = 48;
       tableRef.current.scrollTop = foundIndex * rowHeight;
-
-      const [startTime] = scriptData[foundIndex].time.split(' - ')[0].split(':').map(Number);
-      playerRef.current.seekTo(startTime, 'seconds');
+  
+      // const [startTime] = scriptData[foundIndex].time.split(' - ')[0].split(':').map(Number);
+      // playerRef.current?.seekTo(startTime, 'seconds');
     }
   };
 
@@ -529,7 +529,6 @@ const Home = () => {
       const { ad } = await response.json();
 
       // Update the video URL with the generated ad
-      setGeneratedAdUrl(ad.videoUrl);
       setVideoUrl(ad.videoUrl);
 
       // You might also want to update other state variables with the generated ad data
