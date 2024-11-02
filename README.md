@@ -2,6 +2,8 @@
 
 *Created by Pranav Ramesh, Dinesh Vasireddy, Nikita Mounier*
 
+**[Visit Devpost](https://devpost.com/software/rally-8sxi2t)**
+
 Rally AI is an AI platform that helps politicians connect with voters through personalized, AI-generated campaign advertisements. By leveraging cutting-edge AI technologies, Rally AI creates tailored video ads that address local issues and voter concerns, all while maintaining the authenticity of the politician's message and likeness.
 
 ## Table of Contents
